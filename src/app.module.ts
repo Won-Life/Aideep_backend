@@ -2,10 +2,12 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { PrismaModule } from './common/prisma/prisma.module';
+import { PrismaModule } from './prisma/prisma.module';
 import { UserModule } from './user/user.module';
 import { AuthModule } from './auth/auth.module';
 import { RedisModule } from './common/redis/redis.module';
+import { WorkspaceModule } from './workspace/workspace.module';
+import { NodeModule } from './node/node.module';
 
 @Module({
   imports: [
@@ -13,7 +15,9 @@ import { RedisModule } from './common/redis/redis.module';
     PrismaModule,
     UserModule,
     AuthModule,
-    RedisModule
+    RedisModule,
+    WorkspaceModule,
+    NodeModule
   ],
   controllers: [AppController],
   providers: [AppService]
