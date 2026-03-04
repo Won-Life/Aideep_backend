@@ -19,6 +19,7 @@ interface PdfNodeData extends NodeDataBase {
 
 export class Node {
   id: string;
+  workspaceId: string;
   userId: string;
   title: string;
   nodeType: 'DATA' | 'PROJECT' | 'RESOURCE' | 'ARCHIVE';
