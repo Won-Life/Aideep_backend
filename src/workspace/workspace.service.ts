@@ -11,9 +11,17 @@ export class WorkspaceService {
   async creteWorkspace(userId: string, body: createWorkspaceBody) {
     try {
       const workspace = await this.workspaceRepository.insertWorkspace(body);
-      console.log(workspace);
+      await this.workspaceRepository.insertWorkspaceUser(
+        userId,
+        workspace.workspace_id,
+        body.role
+      );
+      return { workspaceId: workspace.workspace_id };
     } catch (err) {
       console.error(err);
     }
   }
+
+  @Transactional()
+  async joinWorkspace(userId: string) {}
 }

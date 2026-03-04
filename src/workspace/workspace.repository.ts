@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { createWorkspaceBody } from './dto/createWorkspace.dto';
+import { workspace_role_enum } from '@prisma/client';
 
 @Injectable()
 export class WorkspaceRepository {
@@ -17,13 +18,13 @@ export class WorkspaceRepository {
   async insertWorkspaceUser(
     userId: string,
     workspaceId: string,
-    body: createWorkspaceBody
+    role: workspace_role_enum
   ) {
     await this.prisma.users_workspaces.create({
       data: {
         user_id: userId,
         workspace_id: workspaceId,
-        role: body.role
+        role: role
       }
     });
   }

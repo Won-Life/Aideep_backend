@@ -18,6 +18,7 @@ import { NodeMoveEvent, SseService } from './sse.service';
 import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { createWorkspaceBody } from './dto/createWorkspace.dto';
 import { WorkspaceService } from './workspace.service';
+import { JoinWorkspaceBody } from './dto/joinWorkspace.dto';
 
 @Controller('workspace')
 @UseGuards(JwtAuthGuard)
@@ -44,6 +45,10 @@ export class WorkspaceController {
   }
 
   @Post('/')
+  @ApiOperation({
+    summary: '새로운 workspace 생성',
+    description: '본인 소유의 workspace를 생성합니다'
+  })
   async createWorkspace(
     @Body() body: createWorkspaceBody,
     @Request() req: any
@@ -51,6 +56,17 @@ export class WorkspaceController {
     const userId = req.user?.user_id;
     return await this.workspaceService.creteWorkspace(userId, body);
   }
+
+  //TODO: workspace 참여 방식에 대해 추후 논의 할것
+
+  // @Post('/join')
+  // @ApiOperation({
+  //   summary : "workspace에 참여"
+  // })
+  // async joinWorkspace(@Request() req: any, @Body() body: JoinWorkspaceBody) {
+  //   const userId = req.user?.user_id;
+  //   return await this.workspaceService.joinWorkspace(userId);
+  // }
 
   /**
    * 노드 이동 수신 엔드포인트
