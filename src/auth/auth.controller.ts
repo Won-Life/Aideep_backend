@@ -7,7 +7,7 @@ import {
   UseGuards
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { LoginBody } from './dtos/loginBody.dto';
+import { IssueMasterBody, LoginBody } from './dtos/loginBody.dto';
 import { LoginSuccessDataDto } from './dtos/loginResponse.dto';
 import { SignUpBody } from './dtos/signUpBody.dto';
 import { ApiBearerAuth, ApiBody, ApiProperty } from '@nestjs/swagger';
@@ -53,6 +53,11 @@ export class AuthController {
   async signUp(@Body() body: SignUpBody) {
     await this.authService.signUp(body);
     return '회원가입 성공';
+  }
+
+  @Post('/issue/master')
+  async issueMaster(@Body() body: IssueMasterBody) {
+    return await this.authService.issueMasterToken(body.userId);
   }
 
   @Post('/email/send')
