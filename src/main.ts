@@ -4,6 +4,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import { AllExceptionsFilter } from './common/error';
 import { ResponseInterceptor } from './common/response/response.interceptor';
+import { LoggingInterceptor } from './common/logging/logging.interceptor';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 
 async function bootstrap() {
@@ -11,7 +12,10 @@ async function bootstrap() {
 
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
   app.useGlobalFilters(new AllExceptionsFilter());
-  app.useGlobalInterceptors(new ResponseInterceptor());
+  app.useGlobalInterceptors(
+    new LoggingInterceptor(app.get(WINSTON_MODULE_NEST_PROVIDER)),
+    new ResponseInterceptor()
+  );
   app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
 
   const config = new DocumentBuilder()
