@@ -47,7 +47,7 @@ export class AuthService {
   async issueMasterToken(userId: string) {
     const user = await this.userRepository.findByUserId(userId);
     if (!user) {
-      throw new NotFoundException();
+      throw new NotFoundException('존재하지 않는 유저입니다.');
     }
 
     const payload = {
@@ -57,7 +57,7 @@ export class AuthService {
       isMaster: true
     };
 
-    const masterToken = this.jwtService.sign(payload);
+    const masterToken = this.jwtService.sign(payload, { expiresIn: '30d' });
     await this.redisService
       .getClient()
       .set(REDIS_KEYS.REFRESH_TOKEN(userId), masterToken);
