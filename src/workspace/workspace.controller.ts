@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   MessageEvent,
   Patch,
   Post,
@@ -20,6 +21,8 @@ import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { createWorkspaceBody } from './dto/createWorkspace.dto';
 import { WorkspaceService } from './workspace.service';
 import { JoinWorkspaceBody } from './dto/joinWorkspace.dto';
+import { ApiSuccessResponse } from 'src/common/response/api-success-response.decorator';
+import { WorkspaceInfoDto } from './dto/workspaceInfo.dto';
 
 @Controller('workspace')
 @UseGuards(JwtAuthGuard)
@@ -39,9 +42,11 @@ export class WorkspaceController {
     summary: 'SSE 통신 연결 엔드포인트',
     description: 'SSE 통신을 위해 처음 연결합니다.'
   })
-  subscribe(@Query('roomId') roomId: string): Observable<MessageEvent> {
-    console.log(`[SSE] 구독 시작 - roomId: "${roomId}"`);
-    return this.sseService.getStream(roomId);
+  subscribe(
+    @Query('workspaceId') workspaceId: string
+  ): Observable<MessageEvent> {
+    console.log(`[SSE] 구독 시작 - roomId: "${workspaceId}"`);
+    return this.sseService.getStream(workspaceId);
   }
 
   @Post('/')
@@ -68,24 +73,18 @@ export class WorkspaceController {
   //   return await this.workspaceService.joinWorkspace(userId);
   // }
 
-  /**
-   * 노드 이동 수신 엔드포인트
-   * DB 업데이트 후 같은 room의 모든 SSE 구독자에게 브로드캐스트
-   */
-  @Patch('node-move')
-  async moveNode(@Req() req: any) {
-    // await this.prisma.nodes.update({
-    //   where: { node_id: dto.nodeId },
-    //   data: { position_x: dto.x, position_y: dto.y }
-    // });
-
-    this.sseService.emit({
-      type: 'NODE_CREATE',
-      nodeId: 'test,',
-      workspaceId: 'test',
-      userId: 'test'
-    } as NodeCreateEvent);
-
-    return { success: true };
+  @Get('sync')
+  @ApiOperation({
+    summary: 'workspace 화면 동기화',
+    description:
+      'workspace 첫 진입시 workspace의 모든 그래프 데이터를 받아 동기화 합니다.'
+  })
+  @ApiSuccessResponse(WorkspaceInfoDto, 200, '조회 성공')
+  async syncWorkspace(
+    @Query('workspaceId') workspaceId: string,
+    @Request() req: any
+  ) {
+    const userId = req.user?.user_id;
+    return await this.workspaceService.getWorkspaceInfo(userId, workspaceId);
   }
 }
