@@ -99,6 +99,28 @@ export class NodeRespository {
     });
   }
 
+  async selectNodeById(
+    workspaceId: string,
+    nodeId: string
+  ): Promise<RawNodeItem | null> {
+    return await this.prisma.nodes.findFirst({
+      select: {
+        node_id: true,
+        title: true,
+        node_type: true,
+        content: true,
+        version: true,
+        created_at: true,
+        updated_at: true,
+        deleted_at: true,
+        position_x: true,
+        postion_y: true,
+        workspace_id: true
+      },
+      where: { node_id: nodeId, workspace_id: workspaceId, deleted_at: null }
+    });
+  }
+
   async insertNode(node: Node) {
     return await this.prisma.nodes.create({
       data: {

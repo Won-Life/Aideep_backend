@@ -53,7 +53,6 @@ export class NodeController {
     const userId = req.user?.user_id;
     const node = Node.fromProjectDto(body, workspaceId, userId);
     await this.nodeService.createProjectNode(node);
-    this.logger.log('hello');
     return '생성 성공';
   }
 
@@ -62,33 +61,45 @@ export class NodeController {
     summary: 'MD 노드 생성 생성',
     description: '워크스페이스에 새 노드를 생성합니다.'
   })
-  createMarkdownNode(
+  async createMarkdownNode(
+    @Request() req: any,
     @Param('workspaceId') workspaceId: string,
     @Body() body: CreateMarkDownNodeBody
-  ) {}
+  ) {
+    const userId = req.user?.user_id;
+    const node = Node.fromMarkDownDto(body, workspaceId, userId);
+    await this.nodeService.createMarkdownNode(node);
+    return '생성 성공';
+  }
 
   @Post('pdf')
   @ApiOperation({
     summary: 'PDF 노드 생성',
     description: '워크스페이스에 새 노드를 생성합니다.'
   })
-  createPdfNode(
+  async createPdfNode(
     @Param('workspaceId') workspaceId: string,
-    @Body() body: CreatePdfNodeBody
-  ) {}
-
-  @Get()
-  @ApiOperation({
-    summary: '노드 전체 조회',
-    description: '워크스페이스의 모든 노드를 조회합니다.'
-  })
-  async queryAllNode(
-    @Param('workspaceId') workspaceId: string,
+    @Body() body: CreatePdfNodeBody,
     @Request() req: any
   ) {
     const userId = req.user?.user_id;
-    // return await this.nodeService.queryAllNode(workspaceId, userId);
+    const node = Node.fromPdfDto(body, workspaceId, userId);
+    await this.nodeService.createPdfNode(node);
+    return '생성 성공';
   }
+
+  // @Get()
+  // @ApiOperation({
+  //   summary: '노드 전체 조회',
+  //   description: '워크스페이스의 모든 노드를 조회합니다.'
+  // })
+  // async queryAllNode(
+  //   @Param('workspaceId') workspaceId: string,
+  //   @Request() req: any
+  // ) {
+  //   const userId = req.user?.user_id;
+  //   // return await this.nodeService.queryAllNode(workspaceId, userId);
+  // }
 
   @Get(':nodeId')
   @ApiOperation({
@@ -96,10 +107,14 @@ export class NodeController {
     description: '특정 노드의 상세 정보를 조회합니다.'
   })
   @ApiParam({ name: 'nodeId', description: '노드 ID' })
-  queryDetailNode(
+  async queryDetailNode(
     @Param('workspaceId') workspaceId: string,
-    @Param('nodeId') nodeId: string
-  ) {}
+    @Param('nodeId') nodeId: string,
+    @Request() req: any
+  ) {
+    const userId = req.user?.user_id;
+    return await this.nodeService.queryDetailNode(workspaceId, nodeId, userId);
+  }
 
   @Patch(':nodeId')
   @ApiOperation({
@@ -112,14 +127,18 @@ export class NodeController {
     @Param('nodeId') nodeId: string
   ) {}
 
-  @Delete(':nodeId')
-  @ApiOperation({
-    summary: '노드 삭제',
-    description: '특정 노드를 삭제합니다.'
-  })
-  @ApiParam({ name: 'nodeId', description: '노드 ID' })
-  deleteNode(
-    @Param('workspaceId') workspaceId: string,
-    @Param('nodeId') nodeId: string
-  ) {}
+  // @Delete(':nodeId')
+  // @ApiOperation({
+  //   summary: '노드 삭제',
+  //   description: '특정 노드를 삭제합니다.'
+  // })
+  // @ApiParam({ name: 'nodeId', description: '노드 ID' })
+  // deleteNode(
+  //   @Request() req: any,
+  //   @Param('workspaceId') workspaceId: string,
+  //   @Param('nodeId') nodeId: string
+  // ) {
+  //   const userId = req.user?.user_id;
+  //   await this.nodeService
+  // }
 }
