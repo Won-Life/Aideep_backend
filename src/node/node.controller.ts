@@ -9,7 +9,9 @@ import {
   Query,
   Body,
   Req,
-  Request
+  Request,
+  Inject,
+  LoggerService
 } from '@nestjs/common';
 import { NodeService } from './node.service';
 import {
@@ -24,6 +26,8 @@ import {
   CreatePdfNodeBody,
   CreateProjectNodeBody
 } from './dto/createNode.dto';
+import { Node } from './node.model';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 
 @ApiTags('Node')
 @Controller('workspace/:workspaceId/node')
@@ -31,17 +35,27 @@ import {
 @ApiBearerAuth('jwt')
 @ApiParam({ name: 'workspaceId', description: '워크스페이스 ID' })
 export class NodeController {
-  constructor(private readonly nodeService: NodeService) {}
+  constructor(
+    private readonly nodeService: NodeService,
+    @Inject(WINSTON_MODULE_NEST_PROVIDER) private readonly logger: LoggerService
+  ) {}
 
   @Post('/project')
   @ApiOperation({
     summary: '프로젝트 노드 생성 생성',
     description: '워크스페이스에 새 노드를 생성합니다.'
   })
-  createProjectNode(
+  async createProjectNode(
     @Param('workspaceId') workspaceId: string,
-    @Body() body: CreateProjectNodeBody
-  ) {}
+    @Body() body: CreateProjectNodeBody,
+    @Request() req: any
+  ) {
+    const userId = req.user?.user_id;
+    const node = Node.fromProjectDto(body, workspaceId, userId);
+    await this.nodeService.createProjectNode(node);
+    this.logger.log('hello');
+    return '생성 성공';
+  }
 
   @Post('/md')
   @ApiOperation({
@@ -73,7 +87,7 @@ export class NodeController {
     @Request() req: any
   ) {
     const userId = req.user?.user_id;
-    return await this.nodeService.queryAllNode(workspaceId, userId);
+    // return await this.nodeService.queryAllNode(workspaceId, userId);
   }
 
   @Get(':nodeId')
