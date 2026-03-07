@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsString } from 'class-validator';
+import { IsEmail, IsString, IsUUID } from 'class-validator';
 
 export class LoginBody {
   @IsEmail()
@@ -16,6 +16,9 @@ export class LoginBody {
 }
 
 export class IssueMasterBody {
-  @IsString()
+  @IsUUID()
+  @ApiProperty({
+    default: '35f86ed0-c7ef-11eb-bf10-b42e99073dab'
+  })
   userId: string;
 }

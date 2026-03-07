@@ -14,7 +14,8 @@ import { Observable } from 'rxjs';
 import { JwtAuthGuard } from 'src/auth/guards/jwt.guards';
 import { SkipTransform } from 'src/common/response/skip-transform.decorator';
 import { NodeMoveDto } from './dto/node-move.dto';
-import { NodeMoveEvent, SseService } from './sse.service';
+import { SseService } from '../sse/sse.service';
+import { NodeCreateEvent, NodeMoveEvent } from 'src/sse/sse.event';
 import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { createWorkspaceBody } from './dto/createWorkspace.dto';
 import { WorkspaceService } from './workspace.service';
@@ -31,7 +32,6 @@ export class WorkspaceController {
 
   /**
    * SSE 구독 엔드포인트
-   * 클라이언트: const es = new EventSource('/collaboration/sse?roomId=xxx');
    */
   @Sse('/stream')
   @SkipTransform()
@@ -73,20 +73,18 @@ export class WorkspaceController {
    * DB 업데이트 후 같은 room의 모든 SSE 구독자에게 브로드캐스트
    */
   @Patch('node-move')
-  async moveNode(@Body() dto: NodeMoveDto, @Req() req: any) {
+  async moveNode(@Req() req: any) {
     // await this.prisma.nodes.update({
     //   where: { node_id: dto.nodeId },
     //   data: { position_x: dto.x, position_y: dto.y }
     // });
 
-    const event: NodeMoveEvent = {
-      roomId: dto.roomId,
-      nodeId: dto.nodeId,
-      x: dto.x,
-      y: dto.y,
-      userId: req.user.userId
-    };
-    this.sseService.emit(event);
+    this.sseService.emit({
+      type: 'NODE_CREATE',
+      nodeId: 'test,',
+      workspaceId: 'test',
+      userId: 'test'
+    } as NodeCreateEvent);
 
     return { success: true };
   }

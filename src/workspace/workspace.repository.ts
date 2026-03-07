@@ -28,4 +28,13 @@ export class WorkspaceRepository {
       }
     });
   }
+
+  async checkWorkspace(userId: string, workspaceId: string) {
+    return await this.prisma.users_workspaces.findFirst({
+      where: {
+        user_id: userId,
+        workspace_id: workspaceId
+      }
+    });
+  }
 }
