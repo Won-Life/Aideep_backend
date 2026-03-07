@@ -9,12 +9,17 @@ import { createWorkspaceBody } from './dto/createWorkspace.dto';
 import { Transactional } from 'src/prisma/transactional.decorator';
 import { NodeRespository } from 'src/node/node.repository';
 import { WorkspaceInfoDto } from './dto/workspaceInfo.dto';
+import { RedisService } from 'src/redis/redis.service';
+import { REDIS_KEYS } from 'src/redis/redis.keys';
+
+const WORKSPACE_SYNC_TTL = 60 * 10;
 
 @Injectable()
 export class WorkspaceService {
   constructor(
     private readonly workspaceRepository: WorkspaceRepository,
-    private readonly nodeRepository: NodeRespository
+    private readonly nodeRepository: NodeRespository,
+    private readonly redisService: RedisService
   ) {}
 
   @Transactional()
@@ -32,11 +37,14 @@ export class WorkspaceService {
     }
   }
 
-  @Transactional()
   async getWorkspaceInfo(
     userId: string,
     workspaceId: string
   ): Promise<WorkspaceInfoDto> {
+    const cacheKey = REDIS_KEYS.WORKSPACE_SYNC(workspaceId);
+    const cached = await this.redisService.getClient().get(cacheKey);
+    if (cached) return JSON.parse(cached) as WorkspaceInfoDto;
+
     const check = await this.workspaceRepository.checkWorkspace(
       userId,
       workspaceId
@@ -49,10 +57,12 @@ export class WorkspaceService {
     const nodes = await this.nodeRepository.selectAllNode(workspaceId, userId);
     const edges = await this.nodeRepository.selectAllEdge(workspaceId, userId);
 
-    return {
-      nodes: nodes,
-      edges: edges
-    };
+    const result: WorkspaceInfoDto = { nodes, edges };
+    await this.redisService
+      .getClient()
+      .set(cacheKey, JSON.stringify(result), { EX: WORKSPACE_SYNC_TTL });
+
+    return result;
   }
 
   @Transactional()

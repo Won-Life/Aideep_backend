@@ -9,13 +9,16 @@ import { WorkspaceRepository } from 'src/workspace/workspace.repository';
 import { Node } from './node.model';
 import { SseService } from 'src/sse/sse.service';
 import { NodeCreateEvent } from 'src/sse/sse.event';
+import { RedisService } from 'src/redis/redis.service';
+import { REDIS_KEYS } from 'src/redis/redis.keys';
 
 @Injectable()
 export class NodeService {
   constructor(
     private readonly nodeRespository: NodeRespository,
     private readonly workspaceRepository: WorkspaceRepository,
-    private readonly sseService: SseService
+    private readonly sseService: SseService,
+    private readonly redisService: RedisService
   ) {}
 
   async createProjectNode(node: Node) {
@@ -30,6 +33,10 @@ export class NodeService {
       );
     }
     const ans = await this.nodeRespository.insertNode(node);
+
+    await this.redisService
+      .getClient()
+      .del(REDIS_KEYS.WORKSPACE_SYNC(node.workspaceId));
 
     return this.sseService.emit({
       type: 'NODE_CREATE',
