@@ -11,6 +11,7 @@ import { SseModule } from './sse/sse.module';
 import { NodeModule } from './node/node.module';
 import * as winston from 'winston';
 import { utilities, WinstonModule } from 'nest-winston';
+import { EdgeModule } from './edge/edge.module';
 
 @Module({
   imports: [
@@ -32,7 +33,8 @@ import { utilities, WinstonModule } from 'nest-winston';
     RedisModule,
     SseModule,
     WorkspaceModule,
-    NodeModule
+    NodeModule,
+    EdgeModule
   ],
   controllers: [AppController],
   providers: [AppService]
