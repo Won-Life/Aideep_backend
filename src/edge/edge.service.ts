@@ -9,14 +9,14 @@ import { Edge } from './edge.model';
 import { EdgeRepository } from './edge.repository';
 import { WorkspaceRepository } from 'src/workspace/workspace.repository';
 import { Transactional } from 'src/prisma/transactional.decorator';
-import { NodeRespository } from 'src/node/node.repository';
+import { NodeRepository } from 'src/node/node.repository';
 
 @Injectable()
 export class EdgeService {
   constructor(
     private readonly edgeRepository: EdgeRepository,
     private readonly workspaceRepository: WorkspaceRepository,
-    private readonly nodeRepository: NodeRespository
+    private readonly nodeRepository: NodeRepository
   ) {}
   private hasCycle(
     sourceId: string,

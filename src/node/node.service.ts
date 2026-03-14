@@ -3,7 +3,7 @@ import {
   NotFoundException,
   UnauthorizedException
 } from '@nestjs/common';
-import { NodeRespository } from './node.repository';
+import { NodeRepository } from './node.repository';
 // import { Transactional } from 'src/prisma/transactional.decorator';
 import { WorkspaceRepository } from 'src/workspace/workspace.repository';
 import { Node } from './node.model';
@@ -16,7 +16,7 @@ import { Transactional } from 'src/prisma/transactional.decorator';
 @Injectable()
 export class NodeService {
   constructor(
-    private readonly nodeRespository: NodeRespository,
+    private readonly nodeRespository: NodeRepository,
     private readonly workspaceRepository: WorkspaceRepository,
     private readonly sseService: SseService,
     private readonly redisService: RedisService

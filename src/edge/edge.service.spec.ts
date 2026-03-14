@@ -7,7 +7,7 @@ import {
 import { EdgeService } from './edge.service';
 import { EdgeRepository } from './edge.repository';
 import { WorkspaceRepository } from 'src/workspace/workspace.repository';
-import { NodeRespository } from 'src/node/node.repository';
+import { NodeRepository } from 'src/node/node.repository';
 import { Edge } from './edge.model';
 
 // @Transactional() 데코레이터가 runInTransaction을 호출하므로 mock 처리
@@ -19,7 +19,7 @@ describe('EdgeService', () => {
   let service: EdgeService;
   let edgeRepo: jest.Mocked<EdgeRepository>;
   let workspaceRepo: jest.Mocked<WorkspaceRepository>;
-  let nodeRepo: jest.Mocked<NodeRespository>;
+  let nodeRepo: jest.Mocked<NodeRepository>;
 
   const makeEdge = (overrides: Partial<Edge> = {}): Edge =>
     ({
@@ -53,7 +53,7 @@ describe('EdgeService', () => {
           }
         },
         {
-          provide: NodeRespository,
+          provide: NodeRepository,
           useValue: {
             selectNodeById: jest.fn()
           }
@@ -64,7 +64,7 @@ describe('EdgeService', () => {
     service = module.get<EdgeService>(EdgeService);
     edgeRepo = module.get(EdgeRepository);
     workspaceRepo = module.get(WorkspaceRepository);
-    nodeRepo = module.get(NodeRespository);
+    nodeRepo = module.get(NodeRepository);
   });
 
   // 정상 케이스 기본 세팅 헬퍼

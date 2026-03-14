@@ -27,7 +27,6 @@ export type RawEdgeItem = Prisma.edgesGetPayload<{
     target_id: true;
     source_handle: true;
     target_handle: true;
-    target_side: true;
     version: true;
     created_at: true;
     updated_at: true;
@@ -36,9 +35,9 @@ export type RawEdgeItem = Prisma.edgesGetPayload<{
 }>;
 
 @Injectable()
-export class NodeRespository {
+@Injectable()
+export class NodeRepository {
   constructor(private readonly prisma: PrismaService) {}
-
   async selectAllNode(
     workspaceId: string,
     userId: string
@@ -81,7 +80,6 @@ export class NodeRespository {
         target_id: true,
         source_handle: true,
         target_handle: true,
-        target_side: true,
         version: true,
         created_at: true,
         updated_at: true,

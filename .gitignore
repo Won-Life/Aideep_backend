@@ -60,3 +60,6 @@ tunnel.sh
 prisma/*
 
 /.vscode
+
+
+mock/

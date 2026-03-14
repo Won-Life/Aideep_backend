@@ -59,7 +59,7 @@ export class WorkspaceController {
     @Request() req: any
   ) {
     const userId = req.user?.user_id;
-    return await this.workspaceService.creteWorkspace(userId, body);
+    return await this.workspaceService.createWorkspace(userId, body);
   }
 
   //TODO: workspace 참여 방식에 대해 추후 논의 할것
