@@ -12,6 +12,7 @@ import { NodeModule } from './node/node.module';
 import * as winston from 'winston';
 import { utilities, WinstonModule } from 'nest-winston';
 import { EdgeModule } from './edge/edge.module';
+import { UploadModule } from './upload/upload.module';
 
 @Module({
   imports: [
@@ -34,7 +35,8 @@ import { EdgeModule } from './edge/edge.module';
     SseModule,
     WorkspaceModule,
     NodeModule,
-    EdgeModule
+    EdgeModule,
+    UploadModule
   ],
   controllers: [AppController],
   providers: [AppService]
