@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { PrismaService } from 'src/common/prisma/prisma.service';
+import { PrismaService } from 'src/prisma/prisma.service';
 import { SignUpBody } from 'src/auth/dtos/signUpBody.dto';
 
 @Injectable()
@@ -9,7 +9,13 @@ export class UserRepository {
     private readonly prisma: PrismaService
   ) {}
 
-  async findId(email: string) {
+  async findByUserId(userId: string) {
+    return await this.prisma.users.findFirst({
+      where: { user_id: userId }
+    });
+  }
+
+  async findByEmail(email: string) {
     return await this.prisma.users.findFirst({
       where: { email: email }
     });

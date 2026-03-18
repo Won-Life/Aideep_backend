@@ -3,11 +3,11 @@ import { createClient, RedisClientType } from 'redis';
 
 export const redisOptions = {
   socket: {
-    host: 'localhost',
-    port: 6379
+    host: process.env.REDIS_HOST,
+    port: Number(process.env.REDIS_PORT)
   },
-  username: 'aideep',
-  password: 'aideep123!'
+  username: process.env.REDIS_USERNAME,
+  password: process.env.REDIS_PASSWORD
 };
 
 @Injectable()

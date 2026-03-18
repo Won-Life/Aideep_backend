@@ -6,15 +6,14 @@ import {
 } from '@nestjs/common';
 import { UserRepository } from 'src/user/user.repository';
 import { SignUpBody } from './dtos/signUpBody.dto';
-import { IdExistException } from 'src/common/exception/signup.exception';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { JwtPayload } from './strategy/jwt.strategy';
 import { SendMailRequestBody } from './dtos/sendSMS.dto';
 import { transporter } from './mailer.service';
 import dotenv from 'dotenv';
-import { RedisService } from 'src/common/redis/redis.service';
-import { REDIS_KEYS } from 'src/common/redis/redis.keys';
+import { RedisService } from 'src/redis/redis.service';
+import { REDIS_KEYS } from 'src/redis/redis.keys';
 import { VerifyEmailRequestBody } from './dtos/verifyEmail.dto';
 
 dotenv.config();
@@ -28,7 +27,7 @@ export class AuthService {
   ) {}
 
   async validateUser(email: string, password: string) {
-    const user = await this.userRepository.findId(email);
+    const user = await this.userRepository.findByEmail(email);
     if (user === null)
       throw new UnauthorizedException('존재하지 않는 아이디 입니다');
 
@@ -43,6 +42,27 @@ export class AuthService {
         user_id: user.user_id
       };
     return null;
+  }
+
+  async issueMasterToken(userId: string) {
+    const user = await this.userRepository.findByUserId(userId);
+    if (!user) {
+      throw new NotFoundException('존재하지 않는 유저입니다.');
+    }
+
+    const payload = {
+      userName: user.username,
+      email: user.email,
+      user_id: user.user_id,
+      isMaster: true
+    };
+
+    const masterToken = this.jwtService.sign(payload, { expiresIn: '30d' });
+    await this.redisService
+      .getClient()
+      .set(REDIS_KEYS.REFRESH_TOKEN(userId), masterToken);
+
+    return { masterToken };
   }
 
   async login(user: JwtPayload) {
@@ -173,7 +193,7 @@ export class AuthService {
   }
 
   async signUp(dto: SignUpBody) {
-    const check = await this.userRepository.findId(dto.email);
+    const check = await this.userRepository.findByEmail(dto.email);
     const redis = this.redisService.getClient();
 
     if (check !== null) {
