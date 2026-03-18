@@ -5,5 +5,5 @@ export const REDIS_KEYS = {
   REFRESH_TOKEN: (userId: string) => `refreshToken:${userId}`,
   BLACKLIST: (accessToken: string | undefined) => `blacklist:${accessToken}`,
   WORKSPACE_SYNC: (workspaceId: string) => `workspace:sync:${workspaceId}`,
-  INVITE_WORKSPACE: (wokrspaceId: string) => `inviteCode:${wokrspaceId}`
+  INVITE_WORKSPACE: (workspaceId: string) => `inviteCode:${workspaceId}`
 };

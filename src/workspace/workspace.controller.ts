@@ -69,17 +69,25 @@ export class WorkspaceController {
   })
   async inviteWorkspace(@Request() req: any, @Body() body: JoinWorkspaceBody) {
     const userId = req.user?.user_id;
-    return await this.workspaceService.inviteWorkspace(body);
+    return await this.workspaceService.inviteWorkspace(body, userId);
   }
 
-  @Get('/join/:workspaceId')
+  @Post('/join/:workspaceId')
+  @ApiOperation({
+    summary: '워크스페이스 참가',
+    description: '초대 코드를 사용하여 워크스페이스에 참가합니다.'
+  })
   async joinWorkspace(
     @Request() req: any,
     @Param('workspaceId') workspaceId: string,
     @Body() body: { code: string }
   ) {
     const userId = req.user?.user_id;
-    await this.workspaceService.joinWorkspace(body.code, userId, workspaceId);
+    return await this.workspaceService.joinWorkspace(
+      body.code,
+      userId,
+      workspaceId
+    );
   }
 
   @Get('sync')

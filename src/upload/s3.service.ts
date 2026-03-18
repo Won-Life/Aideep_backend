@@ -108,7 +108,10 @@ export class S3Service {
    */
   extractKeyFromUrl(url: string): string {
     const bucketUrl = `https://${this.bucket}.s3.${this.region}.amazonaws.com/`;
-    return url.replace(bucketUrl, '');
+    if (!url.startsWith(bucketUrl)) {
+      throw new Error(`Invalid S3 URL format: ${url}`);
+    }
+    return url.slice(bucketUrl.length);
   }
 
   private getPublicUrl(key: string): string {
