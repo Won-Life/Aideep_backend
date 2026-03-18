@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   MessageEvent,
+  Param,
   Patch,
   Post,
   Query,
@@ -62,16 +63,24 @@ export class WorkspaceController {
     return await this.workspaceService.createWorkspace(userId, body);
   }
 
-  //TODO: workspace 참여 방식에 대해 추후 논의 할것
+  @Post('/invite')
+  @ApiOperation({
+    summary: '해당 워크스페이스 초대 링크를 생성합니다.'
+  })
+  async inviteWorkspace(@Request() req: any, @Body() body: JoinWorkspaceBody) {
+    const userId = req.user?.user_id;
+    return await this.workspaceService.inviteWorkspace(body);
+  }
 
-  // @Post('/join')
-  // @ApiOperation({
-  //   summary : "workspace에 참여"
-  // })
-  // async joinWorkspace(@Request() req: any, @Body() body: JoinWorkspaceBody) {
-  //   const userId = req.user?.user_id;
-  //   return await this.workspaceService.joinWorkspace(userId);
-  // }
+  @Get('/join/:workspaceId')
+  async joinWorkspace(
+    @Request() req: any,
+    @Param('workspaceId') workspaceId: string,
+    @Body() body: { code: string }
+  ) {
+    const userId = req.user?.user_id;
+    await this.workspaceService.joinWorkspace(body.code, userId, workspaceId);
+  }
 
   @Get('sync')
   @ApiOperation({

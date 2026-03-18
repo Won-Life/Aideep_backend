@@ -4,5 +4,6 @@ export const REDIS_KEYS = {
   BLOCK: (phone: string) => `block:${phone}`,
   REFRESH_TOKEN: (userId: string) => `refreshToken:${userId}`,
   BLACKLIST: (accessToken: string | undefined) => `blacklist:${accessToken}`,
-  WORKSPACE_SYNC: (workspaceId: string) => `workspace:sync:${workspaceId}`
+  WORKSPACE_SYNC: (workspaceId: string) => `workspace:sync:${workspaceId}`,
+  INVITE_WORKSPACE: (wokrspaceId: string) => `inviteCode:${wokrspaceId}`
 };

@@ -1,4 +1,5 @@
 import {
+  ForbiddenException,
   Inject,
   Injectable,
   LoggerService,
@@ -11,6 +12,7 @@ import { NodeRepository } from 'src/node/node.repository';
 import { WorkspaceInfoDto } from './dto/workspaceInfo.dto';
 import { RedisService } from 'src/redis/redis.service';
 import { REDIS_KEYS } from 'src/redis/redis.keys';
+import { JoinWorkspaceBody as InviteWorkspaceBody } from './dto/joinWorkspace.dto';
 
 const WORKSPACE_SYNC_TTL = 60 * 10;
 
@@ -61,6 +63,39 @@ export class WorkspaceService {
     return result;
   }
 
-  @Transactional()
-  async joinWorkspace(userId: string) {}
+  async inviteWorkspace(body: InviteWorkspaceBody) {
+    const { workspaceId, role } = body;
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+    const inviteKey = REDIS_KEYS.INVITE_WORKSPACE(workspaceId);
+    const inviteData = JSON.stringify({
+      code: code,
+      role: role
+    });
+    await this.redisService
+      .getClient()
+      .set(inviteKey, inviteData, { EX: 18000 });
+
+    return {
+      code: code,
+      url: `http://localhost:3000/workspace/join/${workspaceId}`
+    };
+  }
+
+  async joinWorkspace(code: string, userId: string, workspaceId: string) {
+    const authCode = REDIS_KEYS.INVITE_WORKSPACE(workspaceId);
+    const check = await this.redisService.getClient().get(authCode);
+
+    if (!check) throw new NotFoundException('존재하지 않는 초대 코드입니다.');
+
+    const stored = JSON.parse(check);
+    if (stored.code !== code)
+      throw new ForbiddenException('코드가 일치하지 않습니다.');
+
+    await this.workspaceRepository.insertWorkspaceUser(
+      userId,
+      workspaceId,
+      stored.role
+    );
+  }
 }
