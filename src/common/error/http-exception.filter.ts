@@ -4,17 +4,27 @@ import {
   ExceptionFilter,
   HttpException,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { Response, Request } from 'express';
 import { BasicError } from './basic-error';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
+  private readonly logger = new Logger(AllExceptionsFilter.name);
+
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
 
     if (exception instanceof BasicError) {
+      if (exception.status >= 500) {
+        this.logger.error(
+          `[${request.method}] ${request.url}`,
+          exception.stack
+        );
+      }
       response.status(exception.status).json(exception.toJSON());
       return;
     }
@@ -36,19 +46,23 @@ export class AllExceptionsFilter implements ExceptionFilter {
         data = res.error || '';
       }
 
+      if (status >= 500) {
+        this.logger.error(`[${request.method}] ${request.url}`, exception.stack);
+      }
+
       response.status(status).json({
         resultType: 'FAIL',
-        error: {
-          errorCode: `HTTP-${status}`,
-          reason,
-          data,
-        },
+        error: { errorCode: `HTTP-${status}`, reason, data },
         success: null,
       });
       return;
     }
 
-    console.error('Unhandled exception:', exception);
+    // 예상치 못한 에러 - 무조건 로깅
+    this.logger.error(
+      `[${request.method}] ${request.url} - Unhandled exception`,
+      exception instanceof Error ? exception.stack : String(exception)
+    );
 
     response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
       resultType: 'FAIL',

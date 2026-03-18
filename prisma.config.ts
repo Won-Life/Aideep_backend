@@ -9,6 +9,6 @@ export default defineConfig({
     seed: 'tsx prisma/seed.ts'
   },
   datasource: {
-    url: env('DATABASE_URL') // schema.prisma에서 변경점!
+    url: env('DATABASE_URL')
   }
 });

@@ -2,8 +2,8 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy, ExtractJwt } from 'passport-jwt';
-import { RedisService } from 'src/common/redis/redis.service';
-import { REDIS_KEYS } from 'src/common/redis/redis.keys';
+import { RedisService } from 'src/redis/redis.service';
+import { REDIS_KEYS } from 'src/redis/redis.keys';
 import { Request } from 'express';
 
 export type JwtPayload = {
