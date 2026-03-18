@@ -1,6 +1,7 @@
 name: Claude Code
 
 on:
+  workflow_dispatch:
   issues:
     types: [opened]
   issue_comment:
