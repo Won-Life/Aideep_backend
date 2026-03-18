@@ -28,6 +28,12 @@ export interface NodeDeleteEvent extends SseEventBase {
   userId: string;
 }
 
+export interface NodeUpdateEvent extends SseEventBase {
+  type: 'NODE_UPDATE';
+  nodeId: string;
+  userId: string;
+}
+
 // 이벤트 추가 시 여기에 union으로 추가
 
-export type SseEvent = NodeMoveEvent | NodeCreateEvent | NodeDeleteEvent;
+export type SseEvent = NodeMoveEvent | NodeCreateEvent | NodeDeleteEvent | NodeUpdateEvent;

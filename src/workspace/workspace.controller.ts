@@ -46,7 +46,6 @@ export class WorkspaceController {
   subscribe(
     @Query('workspaceId') workspaceId: string
   ): Observable<MessageEvent> {
-    console.log(`[SSE] 구독 시작 - roomId: "${workspaceId}"`);
     return this.sseService.getStream(workspaceId);
   }
 

@@ -35,7 +35,6 @@ export type RawEdgeItem = Prisma.edgesGetPayload<{
 }>;
 
 @Injectable()
-@Injectable()
 export class NodeRepository {
   constructor(private readonly prisma: PrismaService) {}
   async selectAllNode(
@@ -128,6 +127,31 @@ export class NodeRepository {
         postion_y: node.position.y,
         workspace_id: node.workspaceId,
         content: node.data as unknown as Prisma.InputJsonValue
+      }
+    });
+  }
+
+  async updateNode(
+    workspaceId: string,
+    nodeId: string,
+    updates: {
+      title?: string;
+      positionX?: number;
+      positionY?: number;
+      content?: Prisma.InputJsonValue;
+    }
+  ) {
+    return await this.prisma.nodes.update({
+      where: { node_id: nodeId, workspace_id: workspaceId, deleted_at: null },
+      data: {
+        ...(updates.title !== undefined && { title: updates.title }),
+        ...(updates.positionX !== undefined && {
+          position_x: updates.positionX
+        }),
+        ...(updates.positionY !== undefined && {
+          postion_y: updates.positionY
+        }),
+        ...(updates.content !== undefined && { content: updates.content })
       }
     });
   }

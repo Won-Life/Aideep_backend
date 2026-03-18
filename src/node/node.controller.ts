@@ -6,9 +6,7 @@ import {
   Param,
   Delete,
   UseGuards,
-  Query,
   Body,
-  Req,
   Request,
   Inject,
   LoggerService
@@ -26,6 +24,7 @@ import {
   CreatePdfNodeBody,
   CreateProjectNodeBody
 } from './dto/createNode.dto';
+import { UpdateNodeBody } from './dto/updateNode.dto';
 import { Node } from './node.model';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 
@@ -119,13 +118,19 @@ export class NodeController {
   @Patch(':nodeId')
   @ApiOperation({
     summary: '노드 수정',
-    description: '특정 노드의 정보를 수정합니다.'
+    description: '특정 노드의 정보를 수정합니다. 변경 사항은 SSE로 전파됩니다.'
   })
   @ApiParam({ name: 'nodeId', description: '노드 ID' })
-  editNode(
+  async editNode(
     @Param('workspaceId') workspaceId: string,
-    @Param('nodeId') nodeId: string
-  ) {}
+    @Param('nodeId') nodeId: string,
+    @Body() body: UpdateNodeBody,
+    @Request() req: any
+  ) {
+    const userId = req.user?.user_id;
+    await this.nodeService.updateNode(workspaceId, nodeId, userId, body);
+    return '수정 성공';
+  }
 
   // @Delete(':nodeId')
   // @ApiOperation({

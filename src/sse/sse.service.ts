@@ -15,9 +15,19 @@ export class SseService {
   }
 
   getStream(workspaceId: string): Observable<MessageEvent> {
-    return this.events$.pipe(
-      filter((event) => event.workspaceId === workspaceId),
-      map((event) => ({ data: event }) as MessageEvent)
-    );
+    return new Observable<MessageEvent>((subscriber) => {
+      console.log(`[SSE] 구독 등록됨 - workspaceId: ${workspaceId}`);
+      const subscription = this.events$
+        .pipe(
+          filter((event) => event.workspaceId === workspaceId),
+          map((event) => ({ data: event }) as MessageEvent)
+        )
+        .subscribe(subscriber);
+
+      return () => {
+        console.log(`[SSE] 구독 해제됨 - workspaceId: ${workspaceId}`);
+        subscription.unsubscribe();
+      };
+    });
   }
 }
