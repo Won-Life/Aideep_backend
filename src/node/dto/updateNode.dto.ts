@@ -89,7 +89,7 @@ export class MarkdownBodyDto {
   markdownBody: string;
 
   @IsString()
-  @ApiProperty({ example: "{contenet : 'stringfy된 json 바디입니다'}" })
+  @ApiProperty({ example: "{content : 'stringify된 json 바디입니다'}" })
   jsonBody: string;
 }
 
@@ -108,6 +108,7 @@ export class UpdateMarkdownNodeBody {
 }
 
 export class NodeMoveBody {
-  @IsJSON()
-  postion: PositionDto;
+  @ValidateNested()
+  @Type(() => PositionDto)
+  position: PositionDto;
 }

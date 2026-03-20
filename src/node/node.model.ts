@@ -103,7 +103,10 @@ export class Node {
 
   private static validateMarkdown(body: MarkdownBodyDto) {
     const { jsonBody, markdownBody } = body;
-    if (markdownBody.length >= 100000) throw new BadRequestException('너무 김');
+    if (markdownBody.length >= MAX_BODY_LENGTH)
+      throw new BadRequestException(
+        `본문은 ${MAX_BODY_LENGTH}를 초과할 수 없습니다.`
+      );
   }
 
   // ──────────────────────────────────────────
@@ -120,7 +123,7 @@ export class Node {
     const node = new Node();
     node.workspaceId = workspaceId;
     node.userId = userId;
-    node.title = dto.title.trim() ?? '제목없음';
+    node.title = dto.title.trim() || '제목없음';
     node.nodeType = 'PROJECT';
     node.position = dto.position;
     node.data = { dataType: 'PROJECT', color: '#ffffff', textColor: '#000000' };

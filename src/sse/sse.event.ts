@@ -23,7 +23,7 @@ export interface NodeCreateEvent extends SseEventBase {
     nodeType: string;
     position: { x: number; y: number };
     data: Record<string, unknown>;
-    createdAt: Date;
+    createdAt: string;
   };
 }
 

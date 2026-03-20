@@ -93,7 +93,7 @@ export class NodeController {
     name: 'nodeId',
     description: '노드 아이디'
   })
-  async modfiyMarkdownNode(
+  async modifyMarkdownNode(
     @Request() req: any,
     @Body() body: UpdateMarkdownNodeBody,
     @Param('nodeId') nodeId: string,
@@ -101,12 +101,13 @@ export class NodeController {
   ) {
     const userId = req.user?.user_id;
     await this.nodeService.updateNodeBody(userId, nodeId, workspaceId, body);
+    return '수정 성공';
   }
 
   @Patch('/:nodeId/move')
   @ApiOperation({
     summary: '노드 이동',
-    description: 'Node의 postion x,y 정보만 업데이트 합니다.'
+    description: 'Node의 position x,y 정보만 업데이트 합니다.'
   })
   @ApiParam({
     name: 'nodeId',

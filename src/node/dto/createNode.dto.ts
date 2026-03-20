@@ -34,6 +34,7 @@ export class CreateMarkDownNodeBody {
   @Type(() => PositionDto)
   position: PositionDto;
 
+  @ApiProperty({ type: MarkdownBodyDto })
   @ValidateNested()
   @Type(() => MarkdownBodyDto)
   body: MarkdownBodyDto;

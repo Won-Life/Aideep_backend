@@ -54,7 +54,7 @@ export class NodeService {
         nodeType: ans.node_type,
         position: { x: ans.position_x, y: ans.position_y },
         data: ans.content as Record<string, unknown>,
-        createdAt: ans.created_at
+        createdAt: ans.created_at.toDateString()
       }
     } as NodeCreateEvent);
   }
@@ -77,7 +77,7 @@ export class NodeService {
         nodeType: ans.node_type,
         position: { x: ans.position_x, y: ans.position_y },
         data: ans.content as Record<string, unknown>,
-        createdAt: ans.created_at
+        createdAt: ans.created_at.toDateString()
       }
     } as NodeCreateEvent);
   }
@@ -139,7 +139,7 @@ export class NodeService {
     workspaceId: string,
     nodeId: string
   ) {
-    const { x, y } = body.postion;
+    const { x, y } = body.position;
     await this.checkEditPermission(userId, workspaceId);
     await this.nodeRespository.updateNode(workspaceId, nodeId, {
       positionX: x,
