@@ -15,7 +15,6 @@ import {
 import { Observable } from 'rxjs';
 import { JwtAuthGuard } from 'src/auth/guards/jwt.guards';
 import { SkipTransform } from 'src/common/response/skip-transform.decorator';
-import { NodeMoveDto } from './dto/node-move.dto';
 import { SseService } from '../sse/sse.service';
 import { NodeCreateEvent, NodeMoveEvent } from 'src/sse/sse.event';
 import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';

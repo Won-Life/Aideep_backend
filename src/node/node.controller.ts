@@ -4,7 +4,6 @@ import {
   Post,
   Patch,
   Param,
-  Delete,
   UseGuards,
   Body,
   Request,
@@ -21,10 +20,9 @@ import {
 import { JwtAuthGuard } from 'src/auth/guards/jwt.guards';
 import {
   CreateMarkDownNodeBody,
-  CreatePdfNodeBody,
   CreateProjectNodeBody
 } from './dto/createNode.dto';
-import { UpdateNodeBody } from './dto/updateNode.dto';
+import { NodeMoveBody, UpdateMarkdownNodeBody } from './dto/updateNode.dto';
 import { Node } from './node.model';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 
@@ -71,35 +69,6 @@ export class NodeController {
     return '생성 성공';
   }
 
-  @Post('pdf')
-  @ApiOperation({
-    summary: 'PDF 노드 생성',
-    description: '워크스페이스에 새 노드를 생성합니다.'
-  })
-  async createPdfNode(
-    @Param('workspaceId') workspaceId: string,
-    @Body() body: CreatePdfNodeBody,
-    @Request() req: any
-  ) {
-    const userId = req.user?.user_id;
-    const node = Node.fromPdfDto(body, workspaceId, userId);
-    await this.nodeService.createPdfNode(node);
-    return '생성 성공';
-  }
-
-  // @Get()
-  // @ApiOperation({
-  //   summary: '노드 전체 조회',
-  //   description: '워크스페이스의 모든 노드를 조회합니다.'
-  // })
-  // async queryAllNode(
-  //   @Param('workspaceId') workspaceId: string,
-  //   @Request() req: any
-  // ) {
-  //   const userId = req.user?.user_id;
-  //   // return await this.nodeService.queryAllNode(workspaceId, userId);
-  // }
-
   @Get(':nodeId')
   @ApiOperation({
     summary: '노드 상세 조회',
@@ -115,22 +84,65 @@ export class NodeController {
     return await this.nodeService.queryDetailNode(workspaceId, nodeId, userId);
   }
 
-  @Patch(':nodeId')
+  @Patch('/:nodeId/md')
   @ApiOperation({
-    summary: '노드 수정',
-    description: '특정 노드의 정보를 수정합니다. 변경 사항은 SSE로 전파됩니다.'
+    summary: '마크다운 노드 수정',
+    description: '마크다운 노드 내용을 수정합니다.'
   })
-  @ApiParam({ name: 'nodeId', description: '노드 ID' })
-  async editNode(
-    @Param('workspaceId') workspaceId: string,
+  @ApiParam({
+    name: 'nodeId',
+    description: '노드 아이디'
+  })
+  async modfiyMarkdownNode(
+    @Request() req: any,
+    @Body() body: UpdateMarkdownNodeBody,
     @Param('nodeId') nodeId: string,
-    @Body() body: UpdateNodeBody,
-    @Request() req: any
+    @Param('workspaceId') workspaceId: string
   ) {
     const userId = req.user?.user_id;
-    await this.nodeService.updateNode(workspaceId, nodeId, userId, body);
-    return '수정 성공';
+    await this.nodeService.updateNodeBody(userId, nodeId, workspaceId, body);
   }
+
+  @Patch('/:nodeId/move')
+  @ApiOperation({
+    summary: '노드 이동',
+    description: 'Node의 postion x,y 정보만 업데이트 합니다.'
+  })
+  @ApiParam({
+    name: 'nodeId',
+    description: '노드 아이디'
+  })
+  async moveNode(
+    @Request() req: any,
+    @Body() body: NodeMoveBody,
+    @Param('nodeId') nodeId: string,
+    @Param('workspaceId') workspaceId: string
+  ) {
+    const userId = req.user?.user_id;
+    await this.nodeService.updateNodePosition(
+      body,
+      userId,
+      workspaceId,
+      nodeId
+    );
+    return '이동 성공';
+  }
+
+  // @Post('/pdf')
+  // @ApiOperation({
+  //   summary: 'PDF 노드 생성',
+  //   description: '워크스페이스에 새 노드를 생성합니다.'
+  // })
+  // async createPdfNode(
+  //   @Param('workspaceId') workspaceId: string,
+  //   @Body() body: CreatePdfNodeBody,
+  //   @Request() req: any
+  // ) {
+  //   const userId = req.user?.user_id;
+  //   const node = Node.fromPdfDto(body, workspaceId, userId);
+  //   await this.nodeService.createPdfNode(node);
+  //   return '생성 성공';
+  // }
 
   // @Delete(':nodeId')
   // @ApiOperation({

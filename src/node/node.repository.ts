@@ -14,7 +14,7 @@ export type RawNodeItem = Prisma.nodesGetPayload<{
     updated_at: true;
     deleted_at: true;
     position_x: true;
-    postion_y: true;
+    position_y: true;
     workspace_id: true;
   };
 }>;
@@ -52,7 +52,7 @@ export class NodeRepository {
         updated_at: true,
         deleted_at: true,
         position_x: true,
-        postion_y: true,
+        position_y: true,
         workspace_id: true
       },
       where: {
@@ -111,7 +111,7 @@ export class NodeRepository {
         updated_at: true,
         deleted_at: true,
         position_x: true,
-        postion_y: true,
+        position_y: true,
         workspace_id: true
       },
       where: { node_id: nodeId, workspace_id: workspaceId, deleted_at: null }
@@ -124,7 +124,7 @@ export class NodeRepository {
         title: node.title,
         node_type: node.nodeType,
         position_x: node.position.x,
-        postion_y: node.position.y,
+        position_y: node.position.y,
         workspace_id: node.workspaceId,
         content: node.data as unknown as Prisma.InputJsonValue
       }
@@ -149,9 +149,10 @@ export class NodeRepository {
           position_x: updates.positionX
         }),
         ...(updates.positionY !== undefined && {
-          postion_y: updates.positionY
+          position_y: updates.positionY
         }),
-        ...(updates.content !== undefined && { content: updates.content })
+        ...(updates.content !== undefined && { content: updates.content }),
+        version: { increment: 1 }
       }
     });
   }

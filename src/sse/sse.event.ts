@@ -8,19 +8,24 @@ interface SseEventBase {
 
 export interface NodeMoveEvent extends SseEventBase {
   type: 'NODE_MOVE';
+  userId: string;
   nodeId: string;
   x: number;
   y: number;
-  userId: string;
 }
 
 export interface NodeCreateEvent extends SseEventBase {
   type: 'NODE_CREATE';
-  workspaceId: string;
-  nodeId: string;
   userId: string;
+  node: {
+    nodeId: string;
+    title: string;
+    nodeType: string;
+    position: { x: number; y: number };
+    data: Record<string, unknown>;
+    createdAt: Date;
+  };
 }
-
 
 export interface NodeDeleteEvent extends SseEventBase {
   type: 'NODE_DELETE';
@@ -32,8 +37,17 @@ export interface NodeUpdateEvent extends SseEventBase {
   type: 'NODE_UPDATE';
   nodeId: string;
   userId: string;
+  patch: {
+    title?: string;
+    position?: { x: number; y: number };
+    data?: Record<string, unknown>;
+  };
 }
 
 // 이벤트 추가 시 여기에 union으로 추가
 
-export type SseEvent = NodeMoveEvent | NodeCreateEvent | NodeDeleteEvent | NodeUpdateEvent;
+export type SseEvent =
+  | NodeMoveEvent
+  | NodeCreateEvent
+  | NodeDeleteEvent
+  | NodeUpdateEvent;

@@ -1,8 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsNumber, IsString, IsUrl, ValidateNested } from 'class-validator';
+import { MarkdownBodyDto } from './updateNode.dto';
 
-class PositionDto {
+export class PositionDto {
   @ApiProperty({ example: 100 })
   @IsNumber()
   x: number;
@@ -33,9 +34,9 @@ export class CreateMarkDownNodeBody {
   @Type(() => PositionDto)
   position: PositionDto;
 
-  @ApiProperty({ example: '## 제목\n내용을 입력하세요.' })
-  @IsString()
-  body: string;
+  @ValidateNested()
+  @Type(() => MarkdownBodyDto)
+  body: MarkdownBodyDto;
 }
 
 class PdfDataDto {

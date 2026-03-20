@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Injectable,
   NotFoundException,
   UnauthorizedException
@@ -8,12 +7,10 @@ import { NodeRepository } from './node.repository';
 import { WorkspaceRepository } from 'src/workspace/workspace.repository';
 import { Node } from './node.model';
 import { SseService } from 'src/sse/sse.service';
-import { NodeCreateEvent, NodeUpdateEvent } from 'src/sse/sse.event';
+import { NodeCreateEvent, NodeMoveEvent } from 'src/sse/sse.event';
 import { RedisService } from 'src/redis/redis.service';
 import { REDIS_KEYS } from 'src/redis/redis.keys';
-import { Transactional } from 'src/prisma/transactional.decorator';
-import { UpdateNodeBody } from './dto/updateNode.dto';
-import { Prisma } from '@prisma/client';
+import { NodeMoveBody, UpdateMarkdownNodeBody } from './dto/updateNode.dto';
 
 @Injectable()
 export class NodeService {
@@ -24,173 +21,99 @@ export class NodeService {
     private readonly redisService: RedisService
   ) {}
 
-  async createProjectNode(node: Node) {
-    const checkWorkspace = await this.workspaceRepository.checkWorkspace(
-      node.userId,
-      node.workspaceId
-    );
-
-    if (checkWorkspace?.role !== 'OWNER') {
-      throw new UnauthorizedException(
-        '워크스페이스의 유저/편집자만 생성 할 수 있습니다.'
-      );
-    }
-    const ans = await this.nodeRespository.insertNode(node);
-
-    await this.redisService
-      .getClient()
-      .del(REDIS_KEYS.WORKSPACE_SYNC(node.workspaceId));
-
-    return this.sseService.emit({
-      type: 'NODE_CREATE',
-      nodeId: ans.node_id,
-      workspaceId: ans.workspace_id,
-      userId: node.userId
-    } as NodeCreateEvent);
-  }
-
-  async createMarkdownNode(node: Node) {
-    const checkWorkspace = await this.workspaceRepository.checkWorkspace(
-      node.userId,
-      node.workspaceId
-    );
-
-    if (checkWorkspace?.role !== 'OWNER') {
-      throw new UnauthorizedException(
-        '워크스페이스의 유저/편집자만 생성 할 수 있습니다.'
-      );
-    }
-    const ans = await this.nodeRespository.insertNode(node);
-
-    await this.redisService
-      .getClient()
-      .del(REDIS_KEYS.WORKSPACE_SYNC(node.workspaceId));
-
-    return this.sseService.emit({
-      type: 'NODE_CREATE',
-      nodeId: ans.node_id,
-      workspaceId: ans.workspace_id,
-      userId: node.userId
-    } as NodeCreateEvent);
-  }
-
-  async createPdfNode(node: Node) {
-    const checkWorkspace = await this.workspaceRepository.checkWorkspace(
-      node.userId,
-      node.workspaceId
-    );
-
-    if (checkWorkspace?.role !== 'OWNER') {
-      throw new UnauthorizedException(
-        '워크스페이스의 유저/편집자만 생성 할 수 있습니다.'
-      );
-    }
-
-    const ans = await this.nodeRespository.insertNode(node);
-
-    await this.redisService
-      .getClient()
-      .del(REDIS_KEYS.WORKSPACE_SYNC(node.workspaceId));
-
-    return this.sseService.emit({
-      type: 'NODE_CREATE',
-      nodeId: ans.node_id,
-      workspaceId: ans.workspace_id,
-      userId: node.userId
-    } as NodeCreateEvent);
-  }
-
-  async updateNode(
-    workspaceId: string,
-    nodeId: string,
-    userId: string,
-    body: UpdateNodeBody
-  ) {
+  private async checkEditPermission(userId: string, workspaceId: string) {
     const checkWorkspace = await this.workspaceRepository.checkWorkspace(
       userId,
       workspaceId
     );
-
     if (!checkWorkspace) {
       throw new NotFoundException(
         '해당 유저의 워크스페이스가 존재하지 않습니다.'
       );
     }
-
     if (checkWorkspace.role !== 'OWNER' && checkWorkspace.role !== 'EDITOR') {
       throw new UnauthorizedException('노드를 수정할 권한이 없습니다.');
     }
+  }
 
-    const existing = await this.nodeRespository.selectNodeById(
-      workspaceId,
-      nodeId
-    );
-    if (!existing) throw new NotFoundException('노드를 찾을 수 없습니다.');
-
-    const existingContent = existing.content as Record<string, unknown>;
-
-    let updatedContent: Prisma.InputJsonValue | undefined;
-    if (body.data) {
-      const dataType = existingContent.dataType as string;
-
-      if (body.data.body !== undefined && dataType !== 'MARKDOWN') {
-        throw new BadRequestException(
-          'body는 MARKDOWN 노드에서만 수정할 수 있습니다.'
-        );
-      }
-
-      if (body.data.body !== undefined) {
-        const MAX_BODY_LENGTH = 100_000;
-        if (body.data.body.length > MAX_BODY_LENGTH) {
-          throw new BadRequestException(
-            `body는 ${MAX_BODY_LENGTH.toLocaleString()}자를 초과할 수 없습니다.`
-          );
-        }
-      }
-
-      updatedContent = {
-        ...existingContent,
-        ...(body.data.body !== undefined && { body: body.data.body }),
-        ...(body.data.color !== undefined && { color: body.data.color }),
-        ...(body.data.textColor !== undefined && {
-          textColor: body.data.textColor
-        })
-      } as Prisma.InputJsonValue;
-    }
-
-    if (body.title !== undefined && body.title.length > 500) {
-      throw new BadRequestException('title은 500자를 초과할 수 없습니다.');
-    }
-
-    if (body.position !== undefined) {
-      const { x, y } = body.position;
-      if (!Number.isFinite(x) || !Number.isFinite(y)) {
-        throw new BadRequestException(
-          'position 값이 유효하지 않습니다. (NaN, Infinity 불가)'
-        );
-      }
-    }
-
-    await this.nodeRespository.updateNode(workspaceId, nodeId, {
-      ...(body.title !== undefined && { title: body.title.trim() }),
-      ...(body.position !== undefined && {
-        positionX: body.position.x,
-        positionY: body.position.y
-      }),
-      ...(updatedContent !== undefined && { content: updatedContent })
-    });
+  async createProjectNode(node: Node) {
+    await this.checkEditPermission(node.userId, node.workspaceId);
+    const ans = await this.nodeRespository.insertNode(node);
 
     await this.redisService
       .getClient()
-      .del(REDIS_KEYS.WORKSPACE_SYNC(workspaceId));
+      .del(REDIS_KEYS.WORKSPACE_SYNC(node.workspaceId));
 
-    this.sseService.emit({
-      type: 'NODE_UPDATE',
-      nodeId,
-      workspaceId,
-      userId
-    } as NodeUpdateEvent);
+    return this.sseService.emit({
+      type: 'NODE_CREATE',
+      workspaceId: ans.workspace_id,
+      userId: node.userId,
+      node: {
+        nodeId: ans.node_id,
+        title: ans.title,
+        nodeType: ans.node_type,
+        position: { x: ans.position_x, y: ans.position_y },
+        data: ans.content as Record<string, unknown>,
+        createdAt: ans.created_at
+      }
+    } as NodeCreateEvent);
   }
+
+  async createMarkdownNode(node: Node) {
+    await this.checkEditPermission(node.userId, node.workspaceId);
+    const ans = await this.nodeRespository.insertNode(node);
+
+    await this.redisService
+      .getClient()
+      .del(REDIS_KEYS.WORKSPACE_SYNC(node.workspaceId));
+
+    return this.sseService.emit({
+      type: 'NODE_CREATE',
+      workspaceId: ans.workspace_id,
+      userId: node.userId,
+      node: {
+        nodeId: ans.node_id,
+        title: ans.title,
+        nodeType: ans.node_type,
+        position: { x: ans.position_x, y: ans.position_y },
+        data: ans.content as Record<string, unknown>,
+        createdAt: ans.created_at
+      }
+    } as NodeCreateEvent);
+  }
+
+  // async createPdfNode(node: Node) {
+  //   const checkWorkspace = await this.workspaceRepository.checkWorkspace(
+  //     node.userId,
+  //     node.workspaceId
+  //   );
+
+  //   if (checkWorkspace?.role !== 'OWNER') {
+  //     throw new UnauthorizedException(
+  //       '워크스페이스의 유저/편집자만 생성 할 수 있습니다.'
+  //     );
+  //   }
+
+  //   const ans = await this.nodeRespository.insertNode(node);
+
+  //   await this.redisService
+  //     .getClient()
+  //     .del(REDIS_KEYS.WORKSPACE_SYNC(node.workspaceId));
+
+  //   return this.sseService.emit({
+  //     type: 'NODE_CREATE',
+  //     workspaceId: ans.workspace_id,
+  //     userId: node.userId,
+  //     node: {
+  //       nodeId: ans.node_id,
+  //       title: ans.title,
+  //       nodeType: ans.node_type,
+  //       position: { x: ans.position_x, y: ans.position_y },
+  //       data: ans.content as Record<string, unknown>,
+  //       createdAt: ans.created_at
+  //     }
+  //   } as NodeCreateEvent);
+  // }
 
   async queryDetailNode(workspaceId: string, nodeId: string, userId: string) {
     const checkWorkspace = await this.workspaceRepository.checkWorkspace(
@@ -210,17 +133,68 @@ export class NodeService {
     return node;
   }
 
-  // @Transactional()
-  // async archiveNode(workspaceId: string, nodeId: string, userId: string) {
-  //   const checkWorkspace = await this.workspaceRepository.checkWorkspace(
-  //     userId,
-  //     workspaceId
-  //   );
+  async updateNodePosition(
+    body: NodeMoveBody,
+    userId: string,
+    workspaceId: string,
+    nodeId: string
+  ) {
+    const { x, y } = body.postion;
+    await this.checkEditPermission(userId, workspaceId);
+    await this.nodeRespository.updateNode(workspaceId, nodeId, {
+      positionX: x,
+      positionY: y
+    });
 
-  //   if (checkWorkspace?.role !== 'OWNER') {
-  //     throw new UnauthorizedException(
-  //       '워크스페이스의 유저/편집자만 생성 할 수 있습니다.'
-  //     );
-  //   }
-  // }
+    this.sseService.emit({
+      userId: userId,
+      nodeId: nodeId,
+      x: x,
+      y: y
+    } as NodeMoveEvent);
+  }
+
+  async updateNodeBody(
+    userId: string,
+    nodeId: string,
+    workspaceId: string,
+    body: UpdateMarkdownNodeBody
+  ) {
+    const { title, body: dto } = body;
+    await this.checkEditPermission(userId, workspaceId);
+
+    const existing = await this.nodeRespository.selectNodeById(
+      workspaceId,
+      nodeId
+    );
+    if (!existing) throw new NotFoundException('노드를 찾을 수 없습니다.');
+
+    // 2. 기존 content에 변경값만 머지
+    const currentContent = existing.content as Record<string, any>;
+    const updatedContent = {
+      ...currentContent,
+      ...(dto?.markdownBody !== undefined && {
+        markdownBody: dto.markdownBody
+      }),
+      ...(dto?.jsonBody !== undefined && { jsonBody: dto.jsonBody })
+    };
+
+    await this.nodeRespository.updateNode(workspaceId, nodeId, {
+      ...(title !== undefined && { title }),
+      content: updatedContent
+    });
+
+    const patch: Record<string, any> = {};
+    if (title !== undefined) patch.title = title;
+    if (dto?.markdownBody !== undefined) patch.markdownBody = dto.markdownBody;
+    if (dto?.jsonBody !== undefined) patch.jsonBody = dto.jsonBody;
+
+    this.sseService.emit({
+      type: 'NODE_UPDATE',
+      workspaceId: workspaceId,
+      nodeId: existing.node_id,
+      userId: userId,
+      patch
+    });
+  }
 }

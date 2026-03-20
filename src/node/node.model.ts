@@ -5,6 +5,7 @@ import {
   CreateProjectNodeBody
 } from './dto/createNode.dto';
 import { IsUUID } from 'class-validator';
+import { MarkdownBodyDto } from './dto/updateNode.dto';
 
 const MAX_TITLE_LENGTH = 500;
 const MAX_BODY_LENGTH = 100_000;
@@ -24,7 +25,8 @@ export interface ProjectNodeData extends NodeDataBase {
 
 interface MarkDownNodeData extends NodeDataBase {
   dataType: 'MARKDOWN';
-  body: string;
+  markdownBody: string;
+  jsonBody: string;
 }
 
 interface PdfNodeData extends NodeDataBase {
@@ -99,11 +101,9 @@ export class Node {
       throw new BadRequestException('허용되지 않은 파일 URL입니다.');
   }
 
-  private static validateMarkdown(body: string) {
-    if (body.length > MAX_BODY_LENGTH)
-      throw new BadRequestException(
-        `body는 ${MAX_BODY_LENGTH.toLocaleString()}자를 초과할 수 없습니다.`
-      );
+  private static validateMarkdown(body: MarkdownBodyDto) {
+    const { jsonBody, markdownBody } = body;
+    if (markdownBody.length >= 100000) throw new BadRequestException('너무 김');
   }
 
   // ──────────────────────────────────────────
@@ -135,6 +135,7 @@ export class Node {
     Node.validateTitle(dto.title);
     Node.validatePosition(dto.position);
     Node.validateMarkdown(dto.body);
+    const { jsonBody, markdownBody } = dto.body;
 
     const node = new Node();
     node.workspaceId = workspaceId;
@@ -144,38 +145,39 @@ export class Node {
     node.position = dto.position;
     node.data = {
       dataType: 'MARKDOWN',
-      body: dto.body,
+      markdownBody: markdownBody,
+      jsonBody: jsonBody,
       color: '#ffffff',
       textColor: '#000000'
     };
     return node;
   }
 
-  static fromPdfDto(
-    dto: CreatePdfNodeBody,
-    workspaceId: string,
-    userId: string
-  ): Node {
-    Node.validateTitle(dto.title);
-    Node.validatePosition(dto.position);
-    Node.validatePdfFileName(dto.data.fileName);
-    Node.validatePdfFileSize(dto.data.fileSize);
-    Node.validatePdfFileUrl(dto.data.fileUrl);
+  // static fromPdfDto(
+  //   dto: CreatePdfNodeBody,
+  //   workspaceId: string,
+  //   userId: string
+  // ): Node {
+  //   Node.validateTitle(dto.title);
+  //   Node.validatePosition(dto.position);
+  //   Node.validatePdfFileName(dto.data.fileName);
+  //   Node.validatePdfFileSize(dto.data.fileSize);
+  //   Node.validatePdfFileUrl(dto.data.fileUrl);
 
-    const node = new Node();
-    node.workspaceId = workspaceId;
-    node.userId = userId;
-    node.title = dto.title.trim();
-    node.nodeType = 'RESOURCE';
-    node.position = dto.position;
-    node.data = {
-      dataType: 'PDF',
-      fileUrl: dto.data.fileUrl,
-      fileName: dto.data.fileName,
-      fileSize: dto.data.fileSize,
-      color: '#ffffff',
-      textColor: '#000000'
-    };
-    return node;
-  }
+  //   const node = new Node();
+  //   node.workspaceId = workspaceId;
+  //   node.userId = userId;
+  //   node.title = dto.title.trim();
+  //   node.nodeType = 'RESOURCE';
+  //   node.position = dto.position;
+  //   node.data = {
+  //     dataType: 'PDF',
+  //     fileUrl: dto.data.fileUrl,
+  //     fileName: dto.data.fileName,
+  //     fileSize: dto.data.fileSize,
+  //     color: '#ffffff',
+  //     textColor: '#000000'
+  //   };
+  //   return node;
+  // }
 }
