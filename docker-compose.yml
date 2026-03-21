@@ -1,0 +1,12 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aideep-app
+
+    network_mode: host
+    env_file:
+      - .env
+
+    restart: unless-stopped
