@@ -10,7 +10,12 @@ import { AuthService } from './auth.service';
 import { IssueMasterBody, LoginBody } from './dtos/loginBody.dto';
 import { LoginSuccessDataDto } from './dtos/loginResponse.dto';
 import { SignUpBody } from './dtos/signUpBody.dto';
-import { ApiBearerAuth, ApiBody, ApiProperty } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOperation,
+  ApiProperty
+} from '@nestjs/swagger';
 import { ApiSuccessResponse } from 'src/common/response/api-success-response.decorator';
 import { JwtAuthGuard } from './guards/jwt.guards';
 import { SendMailRequestBody, SendSmsResponseDto } from './dtos/sendSMS.dto';
@@ -30,6 +35,9 @@ export class AuthController {
 
   @Post('/login')
   @UseGuards(LocalAuthGuard)
+  @ApiOperation({
+    summary: '로그인 합니다.'
+  })
   @ApiBody({ type: LoginBody })
   @ApiSuccessResponse(LoginSuccessDataDto, 200, '로그인 성공')
   async login(@Request() req: Express.Request) {
@@ -37,6 +45,9 @@ export class AuthController {
   }
 
   @Post('/refresh')
+  @ApiOperation({
+    summary: 'accessToken을 재발급 합니다.'
+  })
   @ApiBody({ type: RefreshTokenBody })
   @ApiSuccessResponse(LoginSuccessDataDto, 200, '토큰 재발급 성공')
   async refresh(@Body() body: RefreshTokenBody) {
@@ -44,6 +55,10 @@ export class AuthController {
   }
 
   @Post('/signup')
+  @ApiOperation({
+    summary: '회원가입합니다.',
+    description: '이메일 인증이 된 이메일로 회원가입을 해야합니다.'
+  })
   @ApiBody({ type: SignUpBody })
   @ApiSuccessResponse(
     { type: 'string', example: '회원가입 성공' },
@@ -56,11 +71,19 @@ export class AuthController {
   }
 
   @Post('/issue/master')
+  @ApiOperation({
+    summary: '특정 유저에 대한 마스터 토큰을 발급합니다',
+    description: '개발용'
+  })
   async issueMaster(@Body() body: IssueMasterBody) {
     return await this.authService.issueMasterToken(body.userId);
   }
 
   @Post('/email/send')
+  @ApiOperation({
+    summary: '이메일 인증',
+    description: '이메일 인증을 위해 인증번호를 전송합니다.'
+  })
   @ApiBody({ type: SendMailRequestBody })
   @ApiSuccessResponse(SendSmsResponseDto, 200, '인증번호 전송 성공')
   async sendMessage(@Body() body: SendMailRequestBody) {
@@ -68,6 +91,10 @@ export class AuthController {
   }
 
   @Post('/email/verify')
+  @ApiOperation({
+    summary: '인증번호 검증',
+    description: '전송된 인증번호를 검증합니다.'
+  })
   @ApiBody({ type: VerifyEmailRequestBody })
   @ApiSuccessResponse(
     { type: 'string', example: '인증 성공' },
@@ -79,6 +106,10 @@ export class AuthController {
   }
 
   @Delete('/logout')
+  @ApiOperation({
+    summary: '로그아웃',
+    description: '특정 유저에 대한 refresh 토큰을 무효화 합니다'
+  })
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('jwt')
   @ApiSuccessResponse(
