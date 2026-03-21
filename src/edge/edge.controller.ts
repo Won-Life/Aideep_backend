@@ -18,6 +18,7 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt.guards';
 import { Edge } from './edge.model';
 
 import { WorkspaceRepository } from 'src/workspace/workspace.repository';
+import { ApiSuccessResponse } from 'src/common/response/api-success-response.decorator';
 
 @ApiTags('Edge')
 @UseGuards(JwtAuthGuard)
@@ -32,6 +33,13 @@ export class EdgeController {
 
   @Post('/')
   @ApiOperation({ summary: '두개의 노드를 연결합니다.' })
+  @ApiSuccessResponse(
+    {
+      type: 'string',
+      example: '연결 성공'
+    },
+    200
+  )
   async connectNodes(
     @Param('workspaceId') workspaceId: string,
     @Body() body: ConnectNodeDto,
@@ -40,5 +48,6 @@ export class EdgeController {
     const userId = req.user?.user_id;
     const dto = Edge.create(body, workspaceId, userId);
     await this.edgeService.connectNodes(dto);
+    return '연결 성공';
   }
 }

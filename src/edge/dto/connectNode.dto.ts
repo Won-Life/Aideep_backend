@@ -17,8 +17,4 @@ export class ConnectNodeDto {
   @ApiProperty({ example: 'test' })
   @IsString()
   sourceHandle: string;
-
-  @IsString()
-  @ApiProperty({ example: 'test' })
-  targetSide: string;
 }
