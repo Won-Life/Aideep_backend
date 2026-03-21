@@ -39,7 +39,7 @@ export class AuthController {
     summary: '로그인 합니다.'
   })
   @ApiBody({ type: LoginBody })
-  @ApiSuccessResponse(LoginSuccessDataDto, 200, '로그인 성공')
+  @ApiSuccessResponse(LoginSuccessDataDto, 201, '로그인 성공')
   async login(@Request() req: Express.Request) {
     return this.authService.login(req.user);
   }
@@ -49,7 +49,7 @@ export class AuthController {
     summary: 'accessToken을 재발급 합니다.'
   })
   @ApiBody({ type: RefreshTokenBody })
-  @ApiSuccessResponse(LoginSuccessDataDto, 200, '토큰 재발급 성공')
+  @ApiSuccessResponse(LoginSuccessDataDto, 201, '토큰 재발급 성공')
   async refresh(@Body() body: RefreshTokenBody) {
     return this.authService.refresh(body.refreshToken);
   }
@@ -62,7 +62,7 @@ export class AuthController {
   @ApiBody({ type: SignUpBody })
   @ApiSuccessResponse(
     { type: 'string', example: '회원가입 성공' },
-    200,
+    201,
     '회원가입 성공'
   )
   async signUp(@Body() body: SignUpBody) {
@@ -85,7 +85,7 @@ export class AuthController {
     description: '이메일 인증을 위해 인증번호를 전송합니다.'
   })
   @ApiBody({ type: SendMailRequestBody })
-  @ApiSuccessResponse(SendSmsResponseDto, 200, '인증번호 전송 성공')
+  @ApiSuccessResponse(SendSmsResponseDto, 201, '인증번호 전송 성공')
   async sendMessage(@Body() body: SendMailRequestBody) {
     return await this.authService.sendMail(body);
   }
@@ -98,7 +98,7 @@ export class AuthController {
   @ApiBody({ type: VerifyEmailRequestBody })
   @ApiSuccessResponse(
     { type: 'string', example: '인증 성공' },
-    200,
+    201,
     '인증 성공'
   )
   async verifyEmail(@Body() body: VerifyEmailRequestBody) {

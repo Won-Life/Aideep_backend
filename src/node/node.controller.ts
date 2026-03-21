@@ -25,6 +25,8 @@ import {
 import { NodeMoveBody, UpdateMarkdownNodeBody } from './dto/updateNode.dto';
 import { Node } from './node.model';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
+import { ApiSuccessResponse } from 'src/common/response/api-success-response.decorator';
+import { NodeDetailDto } from './dto/nodeDetail.dto';
 
 @ApiTags('Node')
 @Controller('workspace/:workspaceId/node')
@@ -42,6 +44,7 @@ export class NodeController {
     summary: '프로젝트 노드 생성 생성',
     description: '워크스페이스에 새 노드를 생성합니다.'
   })
+  @ApiSuccessResponse({ type: 'string', example: '생성성공' }, 201)
   async createProjectNode(
     @Param('workspaceId') workspaceId: string,
     @Body() body: CreateProjectNodeBody,
@@ -58,6 +61,11 @@ export class NodeController {
     summary: 'MD 노드 생성 생성',
     description: '워크스페이스에 새 노드를 생성합니다.'
   })
+  @ApiSuccessResponse(
+    { type: 'string', example: '생성 성공' },
+    201,
+    'MD 노드 생성 성공'
+  )
   async createMarkdownNode(
     @Request() req: any,
     @Param('workspaceId') workspaceId: string,
@@ -75,6 +83,7 @@ export class NodeController {
     description: '특정 노드의 상세 정보를 조회합니다.'
   })
   @ApiParam({ name: 'nodeId', description: '노드 ID' })
+  @ApiSuccessResponse(NodeDetailDto, 200, '노드 상세 조회 성공')
   async queryDetailNode(
     @Param('workspaceId') workspaceId: string,
     @Param('nodeId') nodeId: string,
@@ -93,6 +102,11 @@ export class NodeController {
     name: 'nodeId',
     description: '노드 아이디'
   })
+  @ApiSuccessResponse(
+    { type: 'string', example: '수정 성공' },
+    200,
+    '마크다운 노드 수정 성공'
+  )
   async modifyMarkdownNode(
     @Request() req: any,
     @Body() body: UpdateMarkdownNodeBody,
@@ -113,6 +127,11 @@ export class NodeController {
     name: 'nodeId',
     description: '노드 아이디'
   })
+  @ApiSuccessResponse(
+    { type: 'string', example: '이동 성공' },
+    200,
+    '노드 이동 성공'
+  )
   async moveNode(
     @Request() req: any,
     @Body() body: NodeMoveBody,
