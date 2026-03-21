@@ -6,13 +6,19 @@ import {
   NotFoundException
 } from '@nestjs/common';
 import { WorkspaceRepository } from './workspace.repository';
-import { createWorkspaceBody } from './dto/createWorkspace.dto';
+import {
+  CreateWorkspaceBody,
+  CreateWorkspaceResponseDto
+} from './dto/createWorkspace.dto';
 import { Transactional } from 'src/prisma/transactional.decorator';
 import { NodeRepository } from 'src/node/node.repository';
 import { WorkspaceInfoDto } from './dto/workspaceInfo.dto';
 import { RedisService } from 'src/redis/redis.service';
 import { REDIS_KEYS } from 'src/redis/redis.keys';
-import { JoinWorkspaceBody as InviteWorkspaceBody } from './dto/joinWorkspace.dto';
+import {
+  JoinWorkspaceBody as InviteWorkspaceBody,
+  InviteWOrkspaceResponseDto
+} from './dto/joinWorkspace.dto';
 
 const WORKSPACE_SYNC_TTL = 60 * 10;
 
@@ -25,7 +31,10 @@ export class WorkspaceService {
   ) {}
 
   @Transactional()
-  async createWorkspace(userId: string, body: createWorkspaceBody) {
+  async createWorkspace(
+    userId: string,
+    body: CreateWorkspaceBody
+  ): Promise<CreateWorkspaceResponseDto> {
     const workspace = await this.workspaceRepository.insertWorkspace(body);
     await this.workspaceRepository.insertWorkspaceUser(
       userId,
@@ -63,7 +72,10 @@ export class WorkspaceService {
     return result;
   }
 
-  async inviteWorkspace(body: InviteWorkspaceBody, userId: string) {
+  async inviteWorkspace(
+    body: InviteWorkspaceBody,
+    userId: string
+  ): Promise<InviteWOrkspaceResponseDto> {
     const { workspaceId, role } = body;
     const checkHasPerimission = await this.workspaceRepository.checkWorkspace(
       userId,
@@ -115,7 +127,5 @@ export class WorkspaceService {
       workspaceId,
       stored.role
     );
-
-    return '워크스페이스 진입 성공';
   }
 }

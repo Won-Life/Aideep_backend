@@ -17,10 +17,16 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt.guards';
 import { SkipTransform } from 'src/common/response/skip-transform.decorator';
 import { SseService } from '../sse/sse.service';
 import { NodeCreateEvent, NodeMoveEvent } from 'src/sse/sse.event';
-import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { createWorkspaceBody } from './dto/createWorkspace.dto';
+import { ApiBearerAuth, ApiBody, ApiOperation } from '@nestjs/swagger';
+import {
+  CreateWorkspaceBody,
+  CreateWorkspaceResponseDto
+} from './dto/createWorkspace.dto';
 import { WorkspaceService } from './workspace.service';
-import { JoinWorkspaceBody } from './dto/joinWorkspace.dto';
+import {
+  InviteWOrkspaceResponseDto,
+  JoinWorkspaceBody
+} from './dto/joinWorkspace.dto';
 import { ApiSuccessResponse } from 'src/common/response/api-success-response.decorator';
 import { WorkspaceInfoDto } from './dto/workspaceInfo.dto';
 
@@ -40,7 +46,8 @@ export class WorkspaceController {
   @SkipTransform()
   @ApiOperation({
     summary: 'SSE 통신 연결 엔드포인트',
-    description: 'SSE 통신을 위해 처음 연결합니다.'
+    description:
+      'SSE 통신을 위해 처음 연결합니다, 리턴되는 값은 없으며 POSTMAN 등에서 SSE 연결을 유지하여 구독상태를 확인합니다. '
   })
   subscribe(
     @Query('workspaceId') workspaceId: string
@@ -49,12 +56,16 @@ export class WorkspaceController {
   }
 
   @Post('/')
+  @ApiBody({
+    type: CreateWorkspaceBody
+  })
   @ApiOperation({
     summary: '새로운 workspace 생성',
     description: '본인 소유의 workspace를 생성합니다'
   })
+  @ApiSuccessResponse(CreateWorkspaceResponseDto, 200)
   async createWorkspace(
-    @Body() body: createWorkspaceBody,
+    @Body() body: CreateWorkspaceBody,
     @Request() req: any
   ) {
     const userId = req.user?.user_id;
@@ -65,6 +76,7 @@ export class WorkspaceController {
   @ApiOperation({
     summary: '해당 워크스페이스 초대 링크를 생성합니다.'
   })
+  @ApiSuccessResponse(InviteWOrkspaceResponseDto, 200)
   async inviteWorkspace(@Request() req: any, @Body() body: JoinWorkspaceBody) {
     const userId = req.user?.user_id;
     return await this.workspaceService.inviteWorkspace(body, userId);
@@ -75,17 +87,21 @@ export class WorkspaceController {
     summary: '워크스페이스 참가',
     description: '초대 코드를 사용하여 워크스페이스에 참가합니다.'
   })
+  @ApiSuccessResponse(
+    {
+      type: 'string',
+      example: '참가성공'
+    },
+    200
+  )
   async joinWorkspace(
     @Request() req: any,
     @Param('workspaceId') workspaceId: string,
     @Body() body: { code: string }
   ) {
     const userId = req.user?.user_id;
-    return await this.workspaceService.joinWorkspace(
-      body.code,
-      userId,
-      workspaceId
-    );
+    await this.workspaceService.joinWorkspace(body.code, userId, workspaceId);
+    return '참가 성공';
   }
 
   @Get('sync')
