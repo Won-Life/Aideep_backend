@@ -17,11 +17,15 @@ async function bootstrap() {
     new ResponseInterceptor()
   );
   app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
+  app.setGlobalPrefix('aideep/api');
 
   const config = new DocumentBuilder()
-    .setTitle('Cats example')
-    .setDescription('The cats API description')
+    .setTitle('Aideep API 문서')
+    .setDescription(
+      'Aideep API 문서입니다. api versioning은 /버전/aideep/api 순서입니다.'
+    )
     .setVersion('1.0')
+    .addServer('/v1/aideep/api')
     .addBearerAuth(
       {
         type: 'http',
@@ -32,9 +36,11 @@ async function bootstrap() {
       'jwt'
     )
     .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
+  const document = SwaggerModule.createDocument(app, config, {
+    ignoreGlobalPrefix: true
+  });
+  SwaggerModule.setup('/docs', app, document);
 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(process.env.PORT ?? 3320);
 }
 bootstrap();
