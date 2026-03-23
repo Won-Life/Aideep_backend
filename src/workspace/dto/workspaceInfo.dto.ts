@@ -1,4 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { workspace_role_enum } from '@prisma/client';
+import { IsDate, IsDateString, IsEnum, IsUUID } from 'class-validator';
 import { RawEdgeItem, RawNodeItem } from 'src/node/node.repository';
 
 export class WorkspaceInfoDto {
@@ -47,4 +49,17 @@ export class WorkspaceInfoDto {
     ]
   })
   edges: RawEdgeItem[];
+}
+
+export class UserWokrpaceInfoDto {
+  @IsUUID()
+  workspaceId: string;
+
+  @IsEnum(workspace_role_enum)
+  @ApiProperty({ example: workspace_role_enum.OWNER })
+  role: workspace_role_enum;
+
+  @IsDate()
+  @ApiProperty({ example: new Date() })
+  joined: Date;
 }

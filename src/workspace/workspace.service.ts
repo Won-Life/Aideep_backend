@@ -12,7 +12,7 @@ import {
 } from './dto/createWorkspace.dto';
 import { Transactional } from 'src/prisma/transactional.decorator';
 import { NodeRepository } from 'src/node/node.repository';
-import { WorkspaceInfoDto } from './dto/workspaceInfo.dto';
+import { UserWokrpaceInfoDto, WorkspaceInfoDto } from './dto/workspaceInfo.dto';
 import { RedisService } from 'src/redis/redis.service';
 import { REDIS_KEYS } from 'src/redis/redis.keys';
 import {
@@ -42,6 +42,20 @@ export class WorkspaceService {
       body.role
     );
     return { workspaceId: workspace.workspace_id };
+  }
+
+  async userWorkspaceInfo(userId: string): Promise<UserWokrpaceInfoDto[]> {
+    const workspaceList =
+      await this.workspaceRepository.selectUserWorkspace(userId);
+
+    const ans = workspaceList.map((props) => {
+      return {
+        workspaceId: props.workspace_id,
+        role: props.role,
+        joined: props.joined_at
+      } as UserWokrpaceInfoDto;
+    });
+    return ans;
   }
 
   async getWorkspaceInfo(

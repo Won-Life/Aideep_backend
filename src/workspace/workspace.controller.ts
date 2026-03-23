@@ -28,7 +28,7 @@ import {
   JoinWorkspaceBody
 } from './dto/joinWorkspace.dto';
 import { ApiSuccessResponse } from 'src/common/response/api-success-response.decorator';
-import { WorkspaceInfoDto } from './dto/workspaceInfo.dto';
+import { UserWokrpaceInfoDto, WorkspaceInfoDto } from './dto/workspaceInfo.dto';
 
 @Controller('workspace')
 @UseGuards(JwtAuthGuard)
@@ -53,6 +53,16 @@ export class WorkspaceController {
     @Query('workspaceId') workspaceId: string
   ): Observable<MessageEvent> {
     return this.sseService.getStream(workspaceId);
+  }
+
+  @Get('/')
+  @ApiOperation({
+    summary: '워크스페이스 리스트'
+  })
+  @ApiSuccessResponse(UserWokrpaceInfoDto, 200)
+  async workspaceList(@Request() req: any): Promise<UserWokrpaceInfoDto[]> {
+    const userId = req.user?.user_id;
+    return await this.workspaceService.userWorkspaceInfo(userId);
   }
 
   @Post('/')

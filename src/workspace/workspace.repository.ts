@@ -7,6 +7,14 @@ import { workspace_role_enum } from '@prisma/client';
 export class WorkspaceRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  async selectUserWorkspace(userId: string) {
+    return await this.prisma.users_workspaces.findMany({
+      where: {
+        user_id: userId
+      }
+    });
+  }
+
   async insertWorkspace(body: CreateWorkspaceBody) {
     return await this.prisma.workspaces.create({
       data: {

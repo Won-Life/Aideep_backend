@@ -25,6 +25,7 @@ async function bootstrap() {
       'Aideep API 문서입니다. api versioning은 /버전/aideep/api 순서입니다.'
     )
     .setVersion('1.0')
+    .addServer('/aideep/api')
     .addServer('/v1/aideep/api')
     .addBearerAuth(
       {
