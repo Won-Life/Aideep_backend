@@ -19,14 +19,24 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private readonly redisService: RedisService
   ) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+        (req: Request) => {
+          // SSE connections use EventSource which cannot set custom headers,
+          // so the token is passed as a query parameter instead.
+          return (req.query?.token as string) ?? null;
+        }
+      ]),
       secretOrKey: config.get<string>('JWT_SECRET'),
       passReqToCallback: true
     });
   }
 
   async validate(req: Request, payload: JwtPayload) {
-    const token = ExtractJwt.fromAuthHeaderAsBearerToken()(req);
+    const token =
+      ExtractJwt.fromAuthHeaderAsBearerToken()(req) ??
+      (req.query?.token as string) ??
+      null;
 
     const blacklisted = await this.redisService
       .getClient()

@@ -157,6 +157,10 @@ export class NodeService {
       positionY: y
     });
 
+    await this.redisService
+      .getClient()
+      .del(REDIS_KEYS.WORKSPACE_SYNC(workspaceId));
+
     const descendantIds = await this.nodeRespository.selectAllDescendantIds(
       workspaceId,
       nodeId
@@ -171,6 +175,8 @@ export class NodeService {
     }
 
     this.sseService.emit({
+      type: 'NODE_MOVE',
+      workspaceId: workspaceId,
       userId: userId,
       nodeId: nodeId,
       x: x,
