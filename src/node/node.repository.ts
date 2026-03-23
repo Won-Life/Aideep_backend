@@ -131,6 +131,49 @@ export class NodeRepository {
     });
   }
 
+  async selectAllDescendantIds(
+    workspaceId: string,
+    nodeId: string
+  ): Promise<string[]> {
+    const rows = await this.prisma.$queryRaw<{ node_id: string }[]>`
+      WITH RECURSIVE descendants AS (
+        SELECT target_id AS node_id
+        FROM edges
+        WHERE source_id = ${nodeId}::uuid
+          AND workspace_id = ${workspaceId}::uuid
+          AND deleted_at IS NULL
+        UNION ALL
+        SELECT e.target_id
+        FROM edges e
+        INNER JOIN descendants d ON e.source_id = d.node_id
+        WHERE e.workspace_id = ${workspaceId}::uuid
+          AND e.deleted_at IS NULL
+      )
+      SELECT DISTINCT node_id FROM descendants
+    `;
+    return rows.map((r) => r.node_id);
+  }
+
+  async updateNodePositionDelta(
+    workspaceId: string,
+    nodeIds: string[],
+    deltaX: number,
+    deltaY: number
+  ) {
+    return await this.prisma.nodes.updateMany({
+      where: {
+        node_id: { in: nodeIds },
+        workspace_id: workspaceId,
+        deleted_at: null
+      },
+      data: {
+        position_x: { increment: deltaX },
+        position_y: { increment: deltaY },
+        version: { increment: 1 }
+      }
+    });
+  }
+
   async updateNode(
     workspaceId: string,
     nodeId: string,

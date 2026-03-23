@@ -141,10 +141,34 @@ export class NodeService {
   ) {
     const { x, y } = body.position;
     await this.checkEditPermission(userId, workspaceId);
+
+    const currentNode = await this.nodeRespository.selectNodeById(
+      workspaceId,
+      nodeId
+    );
+
+    if (!currentNode) throw new NotFoundException('노드를 찾을 수 없습니다.');
+
+    const deltaX = x - (currentNode.position_x ?? 0);
+    const deltaY = y - (currentNode.position_y ?? 0);
+
     await this.nodeRespository.updateNode(workspaceId, nodeId, {
       positionX: x,
       positionY: y
     });
+
+    const descendantIds = await this.nodeRespository.selectAllDescendantIds(
+      workspaceId,
+      nodeId
+    );
+    if (descendantIds.length > 0) {
+      await this.nodeRespository.updateNodePositionDelta(
+        workspaceId,
+        descendantIds,
+        deltaX,
+        deltaY
+      );
+    }
 
     this.sseService.emit({
       userId: userId,
