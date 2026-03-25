@@ -7,7 +7,7 @@ import { NodeRepository } from './node.repository';
 import { WorkspaceRepository } from 'src/workspace/workspace.repository';
 import { Node } from './node.model';
 import { WsGateway } from 'src/ws/ws.gateway';
-import { NodeCreateEvent, NodeMoveEvent } from 'src/sse/sse.event';
+import { NodeCreateEvent, NodeMoveEvent } from 'src/ws/ws.event';
 import { RedisService } from 'src/redis/redis.service';
 import { REDIS_KEYS } from 'src/redis/redis.keys';
 import { NodeMoveBody, UpdateMarkdownNodeBody } from './dto/updateNode.dto';
@@ -36,7 +36,7 @@ export class NodeService {
     }
   }
 
-  async createProjectNode(node: Node) {
+  async createProjectNode(node: Node): Promise<string> {
     await this.checkEditPermission(node.userId, node.workspaceId);
     const ans = await this.nodeRespository.insertNode(node);
 
@@ -44,7 +44,7 @@ export class NodeService {
       .getClient()
       .del(REDIS_KEYS.WORKSPACE_SYNC(node.workspaceId));
 
-    return this.wsGateway.broadcast({
+    this.wsGateway.broadcast({
       type: 'NODE_CREATE',
       workspaceId: ans.workspace_id,
       userId: node.userId,
@@ -57,9 +57,11 @@ export class NodeService {
         createdAt: ans.created_at.toDateString()
       }
     } as NodeCreateEvent);
+
+    return ans.node_id;
   }
 
-  async createMarkdownNode(node: Node) {
+  async createMarkdownNode(node: Node): Promise<string> {
     await this.checkEditPermission(node.userId, node.workspaceId);
     const ans = await this.nodeRespository.insertNode(node);
 
@@ -67,7 +69,7 @@ export class NodeService {
       .getClient()
       .del(REDIS_KEYS.WORKSPACE_SYNC(node.workspaceId));
 
-    return this.wsGateway.broadcast({
+    this.wsGateway.broadcast({
       type: 'NODE_CREATE',
       workspaceId: ans.workspace_id,
       userId: node.userId,
@@ -80,6 +82,8 @@ export class NodeService {
         createdAt: ans.created_at.toDateString()
       }
     } as NodeCreateEvent);
+
+    return ans.node_id;
   }
 
   // async createPdfNode(node: Node) {

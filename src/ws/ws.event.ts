@@ -1,12 +1,12 @@
 // ──────────────────────────────────────────
 // 이벤트 타입 정의
 // ──────────────────────────────────────────
-interface SseEventBase {
+interface WsEventBase {
   type: string;
   workspaceId: string;
 }
 
-export interface NodeMoveEvent extends SseEventBase {
+export interface NodeMoveEvent extends WsEventBase {
   type: 'NODE_MOVE';
   userId: string;
   nodeId: string;
@@ -14,7 +14,7 @@ export interface NodeMoveEvent extends SseEventBase {
   y: number;
 }
 
-export interface NodeCreateEvent extends SseEventBase {
+export interface NodeCreateEvent extends WsEventBase {
   type: 'NODE_CREATE';
   userId: string;
   node: {
@@ -27,13 +27,13 @@ export interface NodeCreateEvent extends SseEventBase {
   };
 }
 
-export interface NodeDeleteEvent extends SseEventBase {
+export interface NodeDeleteEvent extends WsEventBase {
   type: 'NODE_DELETE';
   nodeId: string;
   userId: string;
 }
 
-export interface NodeUpdateEvent extends SseEventBase {
+export interface NodeUpdateEvent extends WsEventBase {
   type: 'NODE_UPDATE';
   nodeId: string;
   userId: string;
@@ -46,7 +46,7 @@ export interface NodeUpdateEvent extends SseEventBase {
 
 // 이벤트 추가 시 여기에 union으로 추가
 
-export type SseEvent =
+export type WsEvent =
   | NodeMoveEvent
   | NodeCreateEvent
   | NodeDeleteEvent

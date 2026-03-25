@@ -52,8 +52,8 @@ export class NodeController {
   ) {
     const userId = req.user?.user_id;
     const node = Node.fromProjectDto(body, workspaceId, userId);
-    await this.nodeService.createProjectNode(node);
-    return '생성 성공';
+    const nodeId = await this.nodeService.createProjectNode(node);
+    return { nodeId };
   }
 
   @Post('/md')
@@ -73,8 +73,8 @@ export class NodeController {
   ) {
     const userId = req.user?.user_id;
     const node = Node.fromMarkDownDto(body, workspaceId, userId);
-    await this.nodeService.createMarkdownNode(node);
-    return '생성 성공';
+    const nodeId = await this.nodeService.createMarkdownNode(node);
+    return { nodeId };
   }
 
   @Get(':nodeId')

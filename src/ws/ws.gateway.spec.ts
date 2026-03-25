@@ -104,6 +104,49 @@ describe('WsGateway', () => {
     });
   });
 
+  describe('handleLivePosition', () => {
+    it('should broadcast node_position_live to the workspace room excluding sender', () => {
+      const mockEmit = jest.fn();
+      const client = {
+        to: jest.fn().mockReturnValue({ emit: mockEmit }),
+      } as unknown as Socket;
+
+      const payload = {
+        workspaceId: 'ws-abc',
+        nodeId: 'node-1',
+        x: 150,
+        y: 300,
+      };
+
+      gateway.handleLivePosition(payload, client);
+
+      expect(client.to).toHaveBeenCalledWith('ws-abc');
+      expect(mockEmit).toHaveBeenCalledWith('node_position_live', payload);
+    });
+
+    it('should forward the exact payload without modification', () => {
+      const mockEmit = jest.fn();
+      const client = {
+        to: jest.fn().mockReturnValue({ emit: mockEmit }),
+      } as unknown as Socket;
+
+      const payload = {
+        workspaceId: 'ws-xyz',
+        nodeId: 'node-99',
+        x: -42.5,
+        y: 1000.123,
+      };
+
+      gateway.handleLivePosition(payload, client);
+
+      const emittedPayload = mockEmit.mock.calls[0][1];
+      expect(emittedPayload).toEqual(payload);
+      expect(emittedPayload.nodeId).toBe('node-99');
+      expect(emittedPayload.x).toBe(-42.5);
+      expect(emittedPayload.y).toBe(1000.123);
+    });
+  });
+
   describe('broadcast', () => {
     it('should emit workspace_event to the correct room', () => {
       const event = {
