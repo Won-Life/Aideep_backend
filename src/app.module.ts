@@ -7,7 +7,7 @@ import { UserModule } from './user/user.module';
 import { AuthModule } from './auth/auth.module';
 import { RedisModule } from './redis/redis.module';
 import { WorkspaceModule } from './workspace/workspace.module';
-import { SseModule } from './sse/sse.module';
+import { WsModule } from './ws/ws.module';
 import { NodeModule } from './node/node.module';
 import * as winston from 'winston';
 import { utilities, WinstonModule } from 'nest-winston';
@@ -32,7 +32,7 @@ import { UploadModule } from './upload/upload.module';
     UserModule,
     AuthModule,
     RedisModule,
-    SseModule,
+    WsModule,
     WorkspaceModule,
     NodeModule,
     EdgeModule,

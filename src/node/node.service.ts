@@ -6,7 +6,7 @@ import {
 import { NodeRepository } from './node.repository';
 import { WorkspaceRepository } from 'src/workspace/workspace.repository';
 import { Node } from './node.model';
-import { SseService } from 'src/sse/sse.service';
+import { WsGateway } from 'src/ws/ws.gateway';
 import { NodeCreateEvent, NodeMoveEvent } from 'src/sse/sse.event';
 import { RedisService } from 'src/redis/redis.service';
 import { REDIS_KEYS } from 'src/redis/redis.keys';
@@ -17,7 +17,7 @@ export class NodeService {
   constructor(
     private readonly nodeRespository: NodeRepository,
     private readonly workspaceRepository: WorkspaceRepository,
-    private readonly sseService: SseService,
+    private readonly wsGateway: WsGateway,
     private readonly redisService: RedisService
   ) {}
 
@@ -44,7 +44,7 @@ export class NodeService {
       .getClient()
       .del(REDIS_KEYS.WORKSPACE_SYNC(node.workspaceId));
 
-    return this.sseService.emit({
+    return this.wsGateway.broadcast({
       type: 'NODE_CREATE',
       workspaceId: ans.workspace_id,
       userId: node.userId,
@@ -67,7 +67,7 @@ export class NodeService {
       .getClient()
       .del(REDIS_KEYS.WORKSPACE_SYNC(node.workspaceId));
 
-    return this.sseService.emit({
+    return this.wsGateway.broadcast({
       type: 'NODE_CREATE',
       workspaceId: ans.workspace_id,
       userId: node.userId,
@@ -100,7 +100,7 @@ export class NodeService {
   //     .getClient()
   //     .del(REDIS_KEYS.WORKSPACE_SYNC(node.workspaceId));
 
-  //   return this.sseService.emit({
+  //   return this.wsGateway.broadcast({
   //     type: 'NODE_CREATE',
   //     workspaceId: ans.workspace_id,
   //     userId: node.userId,
@@ -174,7 +174,7 @@ export class NodeService {
       );
     }
 
-    this.sseService.emit({
+    this.wsGateway.broadcast({
       type: 'NODE_MOVE',
       workspaceId: workspaceId,
       userId: userId,
@@ -219,7 +219,7 @@ export class NodeService {
     if (dto?.markdownBody !== undefined) patch.markdownBody = dto.markdownBody;
     if (dto?.jsonBody !== undefined) patch.jsonBody = dto.jsonBody;
 
-    this.sseService.emit({
+    this.wsGateway.broadcast({
       type: 'NODE_UPDATE',
       workspaceId: workspaceId,
       nodeId: existing.node_id,

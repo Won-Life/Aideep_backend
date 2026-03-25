@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsDefined,
   IsJSON,
   IsNumber,
   IsOptional,
@@ -108,6 +109,7 @@ export class UpdateMarkdownNodeBody {
 }
 
 export class NodeMoveBody {
+  @IsDefined()
   @ValidateNested()
   @Type(() => PositionDto)
   position: PositionDto;

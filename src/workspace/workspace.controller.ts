@@ -2,21 +2,13 @@ import {
   Body,
   Controller,
   Get,
-  MessageEvent,
   Param,
-  Patch,
   Post,
   Query,
-  Req,
   Request,
-  Sse,
   UseGuards
 } from '@nestjs/common';
-import { Observable } from 'rxjs';
 import { JwtAuthGuard } from 'src/auth/guards/jwt.guards';
-import { SkipTransform } from 'src/common/response/skip-transform.decorator';
-import { SseService } from '../sse/sse.service';
-import { NodeCreateEvent, NodeMoveEvent } from 'src/sse/sse.event';
 import { ApiBearerAuth, ApiBody, ApiOperation } from '@nestjs/swagger';
 import {
   CreateWorkspaceBody,
@@ -35,25 +27,8 @@ import { UserWokrpaceInfoDto, WorkspaceInfoDto } from './dto/workspaceInfo.dto';
 @ApiBearerAuth('jwt')
 export class WorkspaceController {
   constructor(
-    private readonly sseService: SseService,
     private readonly workspaceService: WorkspaceService
   ) {}
-
-  /**
-   * SSE 구독 엔드포인트
-   */
-  @Sse('/stream')
-  @SkipTransform()
-  @ApiOperation({
-    summary: 'SSE 통신 연결 엔드포인트',
-    description:
-      'SSE 통신을 위해 처음 연결합니다, 리턴되는 값은 없으며 POSTMAN 등에서 SSE 연결을 유지하여 구독상태를 확인합니다. '
-  })
-  subscribe(
-    @Query('workspaceId') workspaceId: string
-  ): Observable<MessageEvent> {
-    return this.sseService.getStream(workspaceId);
-  }
 
   @Get('/')
   @ApiOperation({

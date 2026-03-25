@@ -1,25 +1,7 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  UseGuards,
-  Request
-} from '@nestjs/common';
+import { Controller, Get, UseGuards, Request } from '@nestjs/common';
 import { UserService } from './user.service';
-import {
-  ApiBearerAuth,
-  ApiInternalServerErrorResponse,
-  ApiOperation,
-  ApiParam
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guards/jwt.guards';
-import { ApiSuccessResponse } from 'src/common/response/api-success-response.decorator';
-import { UserSuccessDataDto } from './dto/user.dto';
-import { BasicError } from 'src/common/error';
 import { Request as ExRequest } from 'express';
 
 @Controller('user')
@@ -44,6 +26,10 @@ export class UserController {
   // }
 
   @Get('/me')
+  @ApiOperation({
+    summary: '내 정보 조회',
+    deprecated: true // 이 옵션 추가
+  })
   async getMe(@Request() req: ExRequest) {
     console.log(req.user);
   }
