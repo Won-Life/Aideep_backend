@@ -44,10 +44,23 @@ export interface NodeUpdateEvent extends WsEventBase {
   };
 }
 
+export interface EdgeCreateEvent extends WsEventBase {
+  type: 'EDGE_CREATE';
+  userId: string;
+  edge: {
+    edgeId: string;
+    sourceId: string;
+    targetId: string;
+    sourceHandle: string;
+    targetHandle: string;
+  };
+}
+
 // 이벤트 추가 시 여기에 union으로 추가
 
 export type WsEvent =
   | NodeMoveEvent
   | NodeCreateEvent
   | NodeDeleteEvent
-  | NodeUpdateEvent;
+  | NodeUpdateEvent
+  | EdgeCreateEvent;

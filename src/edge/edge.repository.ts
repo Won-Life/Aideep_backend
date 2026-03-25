@@ -26,11 +26,13 @@ export class EdgeRepository {
   }
 
   async createEdge(dto: Edge) {
-    await this.prisma.edges.create({
+    return await this.prisma.edges.create({
       data: {
         source_id: dto.sourceId,
         target_id: dto.targetId,
-        workspace_id: dto.workspaceId
+        workspace_id: dto.workspaceId,
+        source_handle: dto.sourceHandle,
+        target_handle: dto.targetHandle
       }
     });
   }

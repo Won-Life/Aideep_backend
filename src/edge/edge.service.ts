@@ -10,13 +10,19 @@ import { EdgeRepository } from './edge.repository';
 import { WorkspaceRepository } from 'src/workspace/workspace.repository';
 import { Transactional } from 'src/prisma/transactional.decorator';
 import { NodeRepository } from 'src/node/node.repository';
+import { WsGateway } from 'src/ws/ws.gateway';
+import { EdgeCreateEvent } from 'src/ws/ws.event';
+import { RedisService } from 'src/redis/redis.service';
+import { REDIS_KEYS } from 'src/redis/redis.keys';
 
 @Injectable()
 export class EdgeService {
   constructor(
     private readonly edgeRepository: EdgeRepository,
     private readonly workspaceRepository: WorkspaceRepository,
-    private readonly nodeRepository: NodeRepository
+    private readonly nodeRepository: NodeRepository,
+    private readonly wsGateway: WsGateway,
+    private readonly redisService: RedisService
   ) {}
   private hasCycle(
     sourceId: string,
@@ -105,6 +111,23 @@ export class EdgeService {
     if (this.hasCycle(dto.sourceId, dto.targetId, allEdges))
       throw new BadRequestException('순환 관계가 생성됩니다.');
 
-    await this.edgeRepository.createEdge(dto);
+    const result = await this.edgeRepository.createEdge(dto);
+
+    await this.redisService
+      .getClient()
+      .del(REDIS_KEYS.WORKSPACE_SYNC(dto.workspaceId));
+
+    this.wsGateway.broadcast({
+      type: 'EDGE_CREATE',
+      workspaceId: dto.workspaceId,
+      userId: dto.userId,
+      edge: {
+        edgeId: result.edge_id,
+        sourceId: dto.sourceId,
+        targetId: dto.targetId,
+        sourceHandle: dto.sourceHandle,
+        targetHandle: dto.targetHandle
+      }
+    } as EdgeCreateEvent);
   }
 }

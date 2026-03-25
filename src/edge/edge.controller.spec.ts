@@ -4,6 +4,8 @@ import { EdgeService } from './edge.service';
 import { EdgeRepository } from './edge.repository';
 import { WorkspaceRepository } from '../workspace/workspace.repository';
 import { NodeRepository } from '../node/node.repository';
+import { WsGateway } from '../ws/ws.gateway';
+import { RedisService } from '../redis/redis.service';
 
 describe('EdgeController', () => {
   let controller: EdgeController;
@@ -29,6 +31,16 @@ describe('EdgeController', () => {
         {
           provide: NodeRepository,
           useValue: { selectNodeById: jest.fn() },
+        },
+        {
+          provide: WsGateway,
+          useValue: { broadcast: jest.fn() },
+        },
+        {
+          provide: RedisService,
+          useValue: {
+            getClient: jest.fn().mockReturnValue({ del: jest.fn() }),
+          },
         },
       ],
     }).compile();
