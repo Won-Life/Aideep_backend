@@ -53,21 +53,21 @@ describe('NodeController - moveNode (PATCH /workspace/:workspaceId/node/:nodeId/
     mockNodeService.updateNodePosition.mockResolvedValue(undefined);
     return request(app.getHttpServer())
       .patch(`/workspace/${mockWorkspaceId}/node/${mockNodeId}/move`)
-      .send({ nodeId: mockNodeId, x: 100, y: 200 })
+      .send({ position: { x: 100, y: 200 } })
       .expect(200);
   });
 
   it('x가 문자열 → 400', () => {
     return request(app.getHttpServer())
       .patch(`/workspace/${mockWorkspaceId}/node/${mockNodeId}/move`)
-      .send({ nodeId: mockNodeId, x: 'abc', y: 200 })
+      .send({ position: { x: 'abc', y: 200 } })
       .expect(400);
   });
 
-  it('nodeId가 UUID 아님 → 400', () => {
+  it('position 누락 → 400', () => {
     return request(app.getHttpServer())
       .patch(`/workspace/${mockWorkspaceId}/node/${mockNodeId}/move`)
-      .send({ nodeId: 'not-a-uuid', x: 100, y: 200 })
+      .send({})
       .expect(400);
   });
 
@@ -77,7 +77,7 @@ describe('NodeController - moveNode (PATCH /workspace/:workspaceId/node/:nodeId/
     );
     return request(app.getHttpServer())
       .patch(`/workspace/${mockWorkspaceId}/node/${mockNodeId}/move`)
-      .send({ nodeId: mockNodeId, x: 100, y: 200 })
+      .send({ position: { x: 100, y: 200 } })
       .expect(403);
   });
 
@@ -87,7 +87,7 @@ describe('NodeController - moveNode (PATCH /workspace/:workspaceId/node/:nodeId/
     );
     return request(app.getHttpServer())
       .patch(`/workspace/${mockWorkspaceId}/node/${mockNodeId}/move`)
-      .send({ nodeId: mockNodeId, x: 100, y: 200 })
+      .send({ position: { x: 100, y: 200 } })
       .expect(404);
   });
 });
