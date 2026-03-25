@@ -51,6 +51,7 @@ export class WorkspaceService {
     const ans = workspaceList.map((props) => {
       return {
         workspaceId: props.workspace_id,
+        title: props.workspaces.title,
         role: props.role,
         joined: props.joined_at
       } as UserWokrpaceInfoDto;

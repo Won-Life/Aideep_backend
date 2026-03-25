@@ -11,6 +11,11 @@ export class WorkspaceRepository {
     return await this.prisma.users_workspaces.findMany({
       where: {
         user_id: userId
+      },
+      include: {
+        workspaces: {
+          select: { title: true }
+        }
       }
     });
   }
