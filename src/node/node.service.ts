@@ -225,10 +225,13 @@ export class NodeService {
       content: updatedContent
     });
 
+    await this.redisService
+      .getClient()
+      .del(REDIS_KEYS.WORKSPACE_SYNC(workspaceId));
+
     const patch: Record<string, any> = {};
     if (title !== undefined) patch.title = title;
-    if (dto?.markdownBody !== undefined) patch.markdownBody = dto.markdownBody;
-    if (dto?.jsonBody !== undefined) patch.jsonBody = dto.jsonBody;
+    if (dto !== undefined) patch.data = updatedContent;
 
     this.wsGateway.broadcast({
       type: 'NODE_UPDATE',

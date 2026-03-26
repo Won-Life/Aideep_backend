@@ -10,8 +10,9 @@ export class UserRepository {
   ) {}
 
   async findByUserId(userId: string) {
-    return await this.prisma.client.users.findFirst({
-      where: { user_id: userId }
+    return await this.prisma.client.users.findUnique({
+      where: { user_id: userId },
+      select: { user_id: true, email: true, username: true, created_at: true }
     });
   }
 
