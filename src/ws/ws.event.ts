@@ -56,6 +56,19 @@ export interface EdgeCreateEvent extends WsEventBase {
   };
 }
 
+export interface CursorMoveEvent {
+  userId: string;
+  workspaceId: string;
+  x: number;
+  y: number;
+  userName: string;
+  color: string;
+}
+
+export interface CursorLeaveEvent {
+  userId: string;
+}
+
 // 이벤트 추가 시 여기에 union으로 추가
 
 export type WsEvent =

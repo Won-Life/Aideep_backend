@@ -3,6 +3,7 @@ import {
   WebSocketServer,
   SubscribeMessage,
   OnGatewayConnection,
+  OnGatewayDisconnect,
   MessageBody,
   ConnectedSocket
 } from '@nestjs/websockets';
@@ -14,7 +15,7 @@ import { WsEvent } from './ws.event';
   cors: { origin: '*' },
   namespace: '/workspace'
 })
-export class WsGateway implements OnGatewayConnection {
+export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
@@ -45,6 +46,7 @@ export class WsGateway implements OnGatewayConnection {
     @ConnectedSocket() client: Socket
   ) {
     client.join(payload.workspaceId);
+    client.data.workspaceId = payload.workspaceId;
   }
 
   @SubscribeMessage('node_position_live')
@@ -54,6 +56,33 @@ export class WsGateway implements OnGatewayConnection {
     @ConnectedSocket() client: Socket
   ) {
     client.to(payload.workspaceId).emit('node_position_live', payload);
+  }
+
+  @SubscribeMessage('cursor_move')
+  handleCursorMove(
+    @MessageBody()
+    payload: {
+      workspaceId: string;
+      x: number;
+      y: number;
+      userName: string;
+      color: string;
+    },
+    @ConnectedSocket() client: Socket
+  ) {
+    client.to(payload.workspaceId).emit('cursor_move', {
+      userId: client.data.userId,
+      ...payload
+    });
+  }
+
+  handleDisconnect(client: Socket) {
+    const workspaceId = client.data?.workspaceId;
+    if (!workspaceId) return;
+
+    client.to(workspaceId).emit('cursor_leave', {
+      userId: client.data.userId
+    });
   }
 
   broadcast(event: WsEvent): void {
