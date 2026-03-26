@@ -10,19 +10,19 @@ export class UserRepository {
   ) {}
 
   async findByUserId(userId: string) {
-    return await this.prisma.users.findFirst({
+    return await this.prisma.client.users.findFirst({
       where: { user_id: userId }
     });
   }
 
   async findByEmail(email: string) {
-    return await this.prisma.users.findFirst({
+    return await this.prisma.client.users.findFirst({
       where: { email: email }
     });
   }
 
   async create(dto: SignUpBody) {
-    return await this.prisma.users.create({
+    return await this.prisma.client.users.create({
       data: {
         email: dto.email,
         password: dto.password,
@@ -32,7 +32,7 @@ export class UserRepository {
   }
 
   async findUser(userId: string) {
-    return await this.prisma.users.findFirst({
+    return await this.prisma.client.users.findFirst({
       where: { user_id: userId },
       select: {
         username: true,

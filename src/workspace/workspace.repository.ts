@@ -8,7 +8,7 @@ export class WorkspaceRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async selectUserWorkspace(userId: string) {
-    return await this.prisma.users_workspaces.findMany({
+    return await this.prisma.client.users_workspaces.findMany({
       where: {
         user_id: userId
       },
@@ -21,7 +21,7 @@ export class WorkspaceRepository {
   }
 
   async insertWorkspace(body: CreateWorkspaceBody) {
-    return await this.prisma.workspaces.create({
+    return await this.prisma.client.workspaces.create({
       data: {
         title: body.title
       }
@@ -33,7 +33,7 @@ export class WorkspaceRepository {
     workspaceId: string,
     role: workspace_role_enum
   ) {
-    await this.prisma.users_workspaces.create({
+    await this.prisma.client.users_workspaces.create({
       data: {
         user_id: userId,
         workspace_id: workspaceId,
@@ -43,7 +43,7 @@ export class WorkspaceRepository {
   }
 
   async checkWorkspace(userId: string, workspaceId: string) {
-    return await this.prisma.users_workspaces.findFirst({
+    return await this.prisma.client.users_workspaces.findFirst({
       where: {
         user_id: userId,
         workspace_id: workspaceId

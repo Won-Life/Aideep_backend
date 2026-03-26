@@ -7,19 +7,19 @@ export class EdgeRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async findEdge(sourceId: string, targetId: string) {
-    return await this.prisma.edges.findFirst({
+    return await this.prisma.client.edges.findFirst({
       where: { source_id: sourceId, target_id: targetId }
     });
   }
 
   async findEdgesBySource(sourceId: string) {
-    return await this.prisma.edges.findMany({
+    return await this.prisma.client.edges.findMany({
       where: { source_id: sourceId }
     });
   }
 
   async findAllEdgesInWorkspace(workspaceId: string) {
-    return await this.prisma.edges.findMany({
+    return await this.prisma.client.edges.findMany({
       where: { workspace_id: workspaceId },
       select: { source_id: true, target_id: true }
     });
@@ -34,7 +34,7 @@ export class EdgeRepository {
   }
 
   async createEdge(dto: Edge) {
-    return await this.prisma.edges.create({
+    return await this.prisma.client.edges.create({
       data: {
         source_id: dto.sourceId,
         target_id: dto.targetId,

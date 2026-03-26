@@ -41,7 +41,7 @@ export class NodeRepository {
     workspaceId: string,
     userId: string
   ): Promise<RawNodeItem[]> {
-    return await this.prisma.nodes.findMany({
+    return await this.prisma.client.nodes.findMany({
       select: {
         node_id: true,
         title: true,
@@ -71,7 +71,7 @@ export class NodeRepository {
     workspaceId: string,
     userId: string
   ): Promise<RawEdgeItem[]> {
-    return await this.prisma.edges.findMany({
+    return await this.prisma.client.edges.findMany({
       select: {
         edge_id: true,
         workspace_id: true,
@@ -100,7 +100,7 @@ export class NodeRepository {
     workspaceId: string,
     nodeId: string
   ): Promise<RawNodeItem | null> {
-    return await this.prisma.nodes.findFirst({
+    return await this.prisma.client.nodes.findFirst({
       select: {
         node_id: true,
         title: true,
@@ -119,7 +119,7 @@ export class NodeRepository {
   }
 
   async insertNode(node: Node) {
-    return await this.prisma.nodes.create({
+    return await this.prisma.client.nodes.create({
       data: {
         title: node.title,
         node_type: node.nodeType,
@@ -135,7 +135,7 @@ export class NodeRepository {
     workspaceId: string,
     nodeId: string
   ): Promise<string[]> {
-    const rows = await this.prisma.$queryRaw<{ node_id: string }[]>`
+    const rows = await this.prisma.client.$queryRaw<{ node_id: string }[]>`
       WITH RECURSIVE descendants AS (
         SELECT target_id AS node_id
         FROM edges
@@ -160,7 +160,7 @@ export class NodeRepository {
     deltaX: number,
     deltaY: number
   ) {
-    return await this.prisma.nodes.updateMany({
+    return await this.prisma.client.nodes.updateMany({
       where: {
         node_id: { in: nodeIds },
         workspace_id: workspaceId,
@@ -184,7 +184,7 @@ export class NodeRepository {
       content?: Prisma.InputJsonValue;
     }
   ) {
-    return await this.prisma.nodes.update({
+    return await this.prisma.client.nodes.update({
       where: { node_id: nodeId, workspace_id: workspaceId, deleted_at: null },
       data: {
         ...(updates.title !== undefined && { title: updates.title }),
@@ -201,7 +201,7 @@ export class NodeRepository {
   }
 
   async deleteNode(nodeId: string) {
-    await this.prisma.nodes.update({
+    await this.prisma.client.nodes.update({
       where: { node_id: nodeId },
       data: { deleted_at: new Date(), updated_at: new Date() }
     });
