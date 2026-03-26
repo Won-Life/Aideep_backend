@@ -6,31 +6,26 @@ import {
 } from './transaction.storage';
 
 @Injectable()
-export class PrismaService
-  extends PrismaClient
-  implements OnModuleInit, OnModuleDestroy
-{
-  constructor() {
-    super();
-  }
+export class PrismaService implements OnModuleInit, OnModuleDestroy {
+  private readonly prisma = new PrismaClient();
 
-  get client(): Prisma.TransactionClient | this {
-    return transactionStorage.getStore() ?? this;
+  get client(): Prisma.TransactionClient {
+    return transactionStorage.getStore() ?? this.prisma;
   }
 
   async runInTransaction<T>(fn: () => Promise<T>): Promise<T> {
     if (transactionStorage.getStore()) {
       return fn();
     }
-    return this.$transaction((tx) => transactionStorage.run(tx, fn));
+    return this.prisma.$transaction((tx) => transactionStorage.run(tx, fn));
   }
 
   async onModuleInit() {
     setTransactionRunner(this.runInTransaction.bind(this));
-    await this.$connect();
+    await this.prisma.$connect();
   }
 
   async onModuleDestroy() {
-    await this.$disconnect();
+    await this.prisma.$disconnect();
   }
 }
