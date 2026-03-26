@@ -26,10 +26,7 @@ import { ApiSuccessResponse } from 'src/common/response/api-success-response.dec
 @ApiParam({ name: 'workspaceId', description: '워크스페이스 ID' })
 @Controller('workspace/:workspaceId/edge')
 export class EdgeController {
-  constructor(
-    private readonly edgeService: EdgeService,
-    private readonly workspaceRepository: WorkspaceRepository
-  ) {}
+  constructor(private readonly edgeService: EdgeService) {}
 
   @Post('/')
   @ApiOperation({ summary: '두개의 노드를 연결합니다.' })
@@ -47,7 +44,6 @@ export class EdgeController {
   ) {
     const userId = req.user?.user_id;
     const dto = Edge.create(body, workspaceId, userId);
-    await this.edgeService.connectNodes(dto);
-    return '연결 성공';
+    return await this.edgeService.connectNodes(dto);
   }
 }

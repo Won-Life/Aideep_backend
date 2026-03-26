@@ -129,5 +129,7 @@ export class EdgeService {
         targetHandle: dto.targetHandle
       }
     } as EdgeCreateEvent);
+
+    return { edgeId: result.edge_id };
   }
 }
