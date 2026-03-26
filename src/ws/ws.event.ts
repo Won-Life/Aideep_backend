@@ -30,7 +30,6 @@ export interface NodeCreateEvent extends WsEventBase {
 export interface NodeDeleteEvent extends WsEventBase {
   type: 'NODE_DELETE';
   nodeId: string;
-  userId: string;
 }
 
 export interface NodeUpdateEvent extends WsEventBase {

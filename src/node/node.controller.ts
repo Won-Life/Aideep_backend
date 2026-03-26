@@ -8,7 +8,8 @@ import {
   Body,
   Request,
   Inject,
-  LoggerService
+  LoggerService,
+  Delete
 } from '@nestjs/common';
 import { NodeService } from './node.service';
 import {
@@ -164,18 +165,18 @@ export class NodeController {
   //   return '생성 성공';
   // }
 
-  // @Delete(':nodeId')
-  // @ApiOperation({
-  //   summary: '노드 삭제',
-  //   description: '특정 노드를 삭제합니다.'
-  // })
-  // @ApiParam({ name: 'nodeId', description: '노드 ID' })
-  // deleteNode(
-  //   @Request() req: any,
-  //   @Param('workspaceId') workspaceId: string,
-  //   @Param('nodeId') nodeId: string
-  // ) {
-  //   const userId = req.user?.user_id;
-  //   await this.nodeService
-  // }
+  @Delete(':nodeId')
+  @ApiOperation({
+    summary: '노드 삭제',
+    description: '특정 노드를 삭제합니다.'
+  })
+  @ApiParam({ name: 'nodeId', description: '노드 ID' })
+  async deleteNode(
+    @Request() req: any,
+    @Param('workspaceId') workspaceId: string,
+    @Param('nodeId') nodeId: string
+  ): Promise<string> {
+    const userId = req.user?.user_id;
+    return await this.nodeService.deleteNode(workspaceId, userId, nodeId);
+  }
 }

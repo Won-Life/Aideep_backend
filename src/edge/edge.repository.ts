@@ -25,6 +25,14 @@ export class EdgeRepository {
     });
   }
 
+  async deleteEdgesByNodeId(nodeId: string): Promise<void> {
+    await this.prisma.client.edges.deleteMany({
+      where: {
+        OR: [{ source_id: nodeId }, { target_id: nodeId }]
+      }
+    });
+  }
+
   async createEdge(dto: Edge) {
     return await this.prisma.edges.create({
       data: {

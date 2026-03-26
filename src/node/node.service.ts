@@ -5,18 +5,25 @@ import {
 } from '@nestjs/common';
 import { NodeRepository } from './node.repository';
 import { WorkspaceRepository } from 'src/workspace/workspace.repository';
+import { EdgeRepository } from 'src/edge/edge.repository';
 import { Node } from './node.model';
 import { WsGateway } from 'src/ws/ws.gateway';
-import { NodeCreateEvent, NodeMoveEvent } from 'src/ws/ws.event';
+import {
+  NodeCreateEvent,
+  NodeDeleteEvent,
+  NodeMoveEvent
+} from 'src/ws/ws.event';
 import { RedisService } from 'src/redis/redis.service';
 import { REDIS_KEYS } from 'src/redis/redis.keys';
 import { NodeMoveBody, UpdateMarkdownNodeBody } from './dto/updateNode.dto';
+import { Transactional } from 'src/prisma/transactional.decorator';
 
 @Injectable()
 export class NodeService {
   constructor(
     private readonly nodeRespository: NodeRepository,
     private readonly workspaceRepository: WorkspaceRepository,
+    private readonly edgeRepository: EdgeRepository,
     private readonly wsGateway: WsGateway,
     private readonly redisService: RedisService
   ) {}
@@ -230,5 +237,29 @@ export class NodeService {
       userId: userId,
       patch
     });
+  }
+
+  @Transactional()
+  async deleteNode(workspaceId: string, userId: string, nodeId: string) {
+    await this.checkEditPermission(userId, workspaceId);
+
+    const existing = await this.nodeRespository.selectNodeById(
+      workspaceId,
+      nodeId
+    );
+    if (!existing) throw new NotFoundException('노드를 찾을 수 없습니다.');
+
+    await this.edgeRepository.deleteEdgesByNodeId(nodeId);
+    await this.nodeRespository.deleteNode(nodeId);
+    await this.redisService
+      .getClient()
+      .del(REDIS_KEYS.WORKSPACE_SYNC(workspaceId));
+
+    this.wsGateway.broadcast({
+      type: 'NODE_DELETE',
+      workspaceId: workspaceId,
+      nodeId: nodeId
+    } as NodeDeleteEvent);
+    return '노드 삭제';
   }
 }

@@ -199,4 +199,11 @@ export class NodeRepository {
       }
     });
   }
+
+  async deleteNode(nodeId: string) {
+    await this.prisma.nodes.update({
+      where: { node_id: nodeId },
+      data: { deleted_at: new Date(), updated_at: new Date() }
+    });
+  }
 }
