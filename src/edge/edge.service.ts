@@ -14,6 +14,7 @@ import { WsGateway } from 'src/ws/ws.gateway';
 import { EdgeCreateEvent } from 'src/ws/ws.event';
 import { RedisService } from 'src/redis/redis.service';
 import { REDIS_KEYS } from 'src/redis/redis.keys';
+import { useContainer } from 'class-validator';
 
 @Injectable()
 export class EdgeService {
@@ -24,6 +25,21 @@ export class EdgeService {
     private readonly wsGateway: WsGateway,
     private readonly redisService: RedisService
   ) {}
+  private async checkEditPermission(userId: string, workspaceId: string) {
+    const checkWorkspace = await this.workspaceRepository.checkWorkspace(
+      userId,
+      workspaceId
+    );
+    if (!checkWorkspace) {
+      throw new NotFoundException(
+        '해당 유저의 워크스페이스가 존재하지 않습니다.'
+      );
+    }
+    if (checkWorkspace.role !== 'OWNER' && checkWorkspace.role !== 'EDITOR') {
+      throw new UnauthorizedException('노드를 수정할 권한이 없습니다.');
+    }
+  }
+
   private hasCycle(
     sourceId: string,
     targetId: string,
@@ -52,17 +68,10 @@ export class EdgeService {
 
   @Transactional()
   async connectNodes(dto: Edge) {
-    const check = await this.workspaceRepository.checkWorkspace(
-      dto.userId,
-      dto.workspaceId
-    );
+    await this.checkEditPermission(dto.userId, dto.workspaceId);
+
     if (dto.sourceId === dto.targetId)
       throw new BadRequestException('자기 자신과 연결할 수 없습니다.');
-
-    if (!check || check.role !== 'OWNER')
-      throw new ForbiddenException(
-        '워크스페이스의 소유자 / 편집자만 접근 할 수 있습니다.'
-      );
 
     const source = await this.nodeRepository.selectNodeById(
       dto.workspaceId,
@@ -96,13 +105,13 @@ export class EdgeService {
       throw new BadRequestException('역방향 엣지가 이미 존재합니다.');
 
     // source 노드의 outgoing 엣지 중복 여부 (source는 하나의 엣지만 허용)
-    const sourceOutgoing = await this.edgeRepository.findEdgesBySource(
-      dto.sourceId
-    );
-    if (sourceOutgoing.length > 0)
-      throw new BadRequestException(
-        '해당 노드는 이미 다른 노드와 연결되어 있습니다.'
-      );
+    // const sourceOutgoing = await this.edgeRepository.findEdgesBySource(
+    //   dto.sourceId
+    // );
+    // if (sourceOutgoing.length > 0)
+    //   throw new BadRequestException(
+    //     '해당 노드는 이미 다른 노드와 연결되어 있습니다.'
+    //   );
 
     // 사이클 검출: target에서 BFS로 source 도달 가능 여부
     const allEdges = await this.edgeRepository.findAllEdgesInWorkspace(
@@ -131,5 +140,22 @@ export class EdgeService {
     } as EdgeCreateEvent);
 
     return { edgeId: result.edge_id };
+  }
+
+  async deleteEdge(workspaceId: string, userId: string, edgeId: string) {
+    await this.checkEditPermission(userId, workspaceId);
+
+    await this.edgeRepository.deleteEdge(edgeId);
+    await this.redisService
+      .getClient()
+      .del(REDIS_KEYS.WORKSPACE_SYNC(workspaceId));
+
+    this.wsGateway.broadcast({
+      type: 'EDGE_DELETED',
+      workspaceId: workspaceId,
+      userId: userId,
+      edgeId: edgeId
+    });
+    return '엣지 삭제';
   }
 }

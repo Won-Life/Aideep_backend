@@ -4,7 +4,8 @@ import {
   Param,
   Post,
   UseGuards,
-  Request
+  Request,
+  Delete
 } from '@nestjs/common';
 import { EdgeService } from './edge.service';
 import { ConnectNodeDto } from './dto/connectNode.dto';
@@ -16,8 +17,6 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guards/jwt.guards';
 import { Edge } from './edge.model';
-
-import { WorkspaceRepository } from 'src/workspace/workspace.repository';
 import { ApiSuccessResponse } from 'src/common/response/api-success-response.decorator';
 
 @ApiTags('Edge')
@@ -45,5 +44,15 @@ export class EdgeController {
     const userId = req.user?.user_id;
     const dto = Edge.create(body, workspaceId, userId);
     return await this.edgeService.connectNodes(dto);
+  }
+
+  @Delete('/:edgeId')
+  async deleteEdge(
+    @Param('workspaceId') workspaceId: string,
+    @Param('edgeId') edgeId: string,
+    @Request() req: any
+  ) {
+    const userId = req.user?.user_id;
+    return await this.edgeService.deleteEdge(workspaceId, userId, edgeId);
   }
 }
