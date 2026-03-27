@@ -135,10 +135,11 @@ export class Node {
     workspaceId: string,
     userId: string
   ): Node {
+    console.log(dto);
     Node.validateTitle(dto.title);
     Node.validatePosition(dto.position);
     Node.validateMarkdown(dto.body);
-    const { jsonBody, markdownBody } = dto.body;
+    const { jsonBody, markdownBody, color, textColor } = dto.body;
 
     const node = new Node();
     node.workspaceId = workspaceId;
@@ -150,8 +151,8 @@ export class Node {
       dataType: 'MARKDOWN',
       markdownBody: markdownBody,
       jsonBody: jsonBody,
-      color: '#ffffff',
-      textColor: '#000000'
+      color: color,
+      textColor: textColor
     };
     return node;
   }

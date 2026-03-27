@@ -92,6 +92,14 @@ export class MarkdownBodyDto {
   @IsString()
   @ApiProperty({ example: "{content : 'stringify된 json 바디입니다'}" })
   jsonBody: string;
+
+  @IsString()
+  @ApiProperty({ example: 'ffffff' })
+  color: string;
+
+  @IsString()
+  @ApiProperty({ example: 'ffffff' })
+  textColor: string;
 }
 
 export class UpdateMarkdownNodeBody {
