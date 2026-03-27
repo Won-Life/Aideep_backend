@@ -12,6 +12,12 @@ export class EdgeRepository {
     });
   }
 
+  async findEdgeById(edgeId: string) {
+    return await this.prisma.client.edges.findFirst({
+      where: { edge_id: edgeId }
+    });
+  }
+
   async findEdgesBySource(sourceId: string) {
     return await this.prisma.client.edges.findMany({
       where: { source_id: sourceId }

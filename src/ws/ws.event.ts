@@ -54,6 +54,11 @@ export interface EdgeCreateEvent extends WsEventBase {
     targetHandle: string;
   };
 }
+export interface EdgeDeleteEvent extends WsEventBase {
+  type: 'EDGE_DELETED';
+  userId: string;
+  edgeId: string;
+}
 
 export interface CursorMoveEvent {
   userId: string;
@@ -75,4 +80,5 @@ export type WsEvent =
   | NodeCreateEvent
   | NodeDeleteEvent
   | NodeUpdateEvent
-  | EdgeCreateEvent;
+  | EdgeCreateEvent
+  | EdgeDeleteEvent;

@@ -36,7 +36,7 @@ export class EdgeService {
       );
     }
     if (checkWorkspace.role !== 'OWNER' && checkWorkspace.role !== 'EDITOR') {
-      throw new UnauthorizedException('노드를 수정할 권한이 없습니다.');
+      throw new ForbiddenException('엣지를 수정할 권한이 없습니다.');
     }
   }
 
@@ -144,6 +144,9 @@ export class EdgeService {
 
   async deleteEdge(workspaceId: string, userId: string, edgeId: string) {
     await this.checkEditPermission(userId, workspaceId);
+
+    const isExist = await this.edgeRepository.findEdgeById(edgeId);
+    if (!isExist) throw new NotFoundException('해당 엣지가 존재하지 않습니다.');
 
     await this.edgeRepository.deleteEdge(edgeId);
     await this.redisService
