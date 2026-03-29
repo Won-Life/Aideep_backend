@@ -85,7 +85,7 @@ export class EdgeService {
     if (!source || !target)
       throw new NotFoundException('해당 노드가 존재하지 않습니다.');
 
-    if (source.node_type === 'PROJECT')
+    if (target.node_type === 'PROJECT')
       throw new BadRequestException('프로젝트 노드는 연결 할 수 없습니다');
 
     // 이미 동일한 방향 엣지 존재 여부
