@@ -1,0 +1,220 @@
+import { Injectable, OnModuleDestroy, Logger } from '@nestjs/common';
+import * as Y from 'yjs';
+import { YjsCrdtService } from './yjs-crdt.service';
+import {
+  DEBOUNCE_SAVE_MS,
+  SAFETY_FLUSH_INTERVAL_MS,
+  DOC_IDLE_TIMEOUT_MS
+} from './yjs.constants';
+
+interface ManagedDoc {
+  doc: Y.Doc;
+  clients: Set<string>;
+  workspaceId: string;
+  saveTimer: ReturnType<typeof setTimeout> | null;
+  idleTimer: ReturnType<typeof setTimeout> | null;
+  lastActivity: number;
+}
+
+@Injectable()
+export class YjsDocManager implements OnModuleDestroy {
+  private readonly logger = new Logger(YjsDocManager.name);
+  private readonly docs = new Map<string, ManagedDoc>();
+  private readonly loading = new Map<string, Promise<Y.Doc>>();
+  private flushInterval: ReturnType<typeof setInterval>;
+
+  constructor(private readonly crdtService: YjsCrdtService) {
+    this.flushInterval = setInterval(
+      () => this.flushAll(),
+      SAFETY_FLUSH_INTERVAL_MS
+    );
+  }
+
+  // ── Doc 로드/생성 ────────────────────────────────────────────
+
+  async getOrCreateDoc(nodeId: string, workspaceId: string): Promise<Y.Doc> {
+    const existing = this.docs.get(nodeId);
+    if (existing) {
+      // idle timer 취소 (다시 활성화됨)
+      if (existing.idleTimer) {
+        clearTimeout(existing.idleTimer);
+        existing.idleTimer = null;
+      }
+      return existing.doc;
+    }
+
+    // 동시 로드 방지: 이미 로딩 중이면 기다림
+    const pending = this.loading.get(nodeId);
+    if (pending) return pending;
+
+    const promise = this.loadDoc(nodeId, workspaceId);
+    this.loading.set(nodeId, promise);
+
+    try {
+      return await promise;
+    } finally {
+      this.loading.delete(nodeId);
+    }
+  }
+
+  private async loadDoc(nodeId: string, workspaceId: string): Promise<Y.Doc> {
+    const doc = new Y.Doc();
+
+    // 1차: Redis
+    let state = await this.crdtService.loadFromRedis(nodeId);
+
+    // 2차: DB
+    if (!state) {
+      const dbResult = await this.crdtService.loadFromDb(nodeId);
+      if (dbResult?.state) {
+        state = dbResult.state;
+        workspaceId = dbResult.workspaceId;
+      }
+    }
+
+    if (state) {
+      Y.applyUpdate(
+        doc,
+        new Uint8Array(state.buffer, state.byteOffset, state.byteLength)
+      );
+    }
+
+    // getText('content')가 초기화되도록 보장
+    doc.getText('content');
+
+    this.docs.set(nodeId, {
+      doc,
+      clients: new Set(),
+      workspaceId,
+      saveTimer: null,
+      idleTimer: null,
+      lastActivity: Date.now()
+    });
+
+    return doc;
+  }
+
+  // ── 클라이언트 관리 ──────────────────────────────────────────
+
+  addClient(nodeId: string, socketId: string): void {
+    const managed = this.docs.get(nodeId);
+    if (!managed) return;
+    managed.clients.add(socketId);
+    managed.lastActivity = Date.now();
+  }
+
+  removeClient(nodeId: string, socketId: string): void {
+    const managed = this.docs.get(nodeId);
+    if (!managed) return;
+
+    managed.clients.delete(socketId);
+
+    if (managed.clients.size === 0) {
+      // 즉시 flush, idle timeout 후 메모리에서 제거
+      this.flushDoc(nodeId).catch((err) =>
+        this.logger.error(`Flush failed for ${nodeId}`, err)
+      );
+
+      managed.idleTimer = setTimeout(() => {
+        this.evictDoc(nodeId);
+      }, DOC_IDLE_TIMEOUT_MS);
+    }
+  }
+
+  getClientCount(nodeId: string): number {
+    return this.docs.get(nodeId)?.clients.size ?? 0;
+  }
+
+  // ── Update 적용 ──────────────────────────────────────────────
+
+  applyUpdate(nodeId: string, update: Uint8Array): void {
+    const managed = this.docs.get(nodeId);
+    if (!managed) return;
+
+    Y.applyUpdate(managed.doc, update);
+    managed.lastActivity = Date.now();
+
+    // debounced save
+    if (managed.saveTimer) clearTimeout(managed.saveTimer);
+    managed.saveTimer = setTimeout(() => {
+      this.flushDoc(nodeId).catch((err) =>
+        this.logger.error(`Debounced flush failed for ${nodeId}`, err)
+      );
+    }, DEBOUNCE_SAVE_MS);
+  }
+
+  // ── 영속화 ───────────────────────────────────────────────────
+
+  async flushDoc(nodeId: string): Promise<void> {
+    const managed = this.docs.get(nodeId);
+    if (!managed) return;
+
+    if (managed.saveTimer) {
+      clearTimeout(managed.saveTimer);
+      managed.saveTimer = null;
+    }
+
+    const state = Buffer.from(Y.encodeStateAsUpdate(managed.doc));
+    const markdownText = managed.doc.getText('content').toString();
+
+    await Promise.all([
+      this.crdtService.saveToRedis(nodeId, state),
+      this.crdtService.saveToDb(
+        nodeId,
+        state,
+        markdownText,
+        managed.workspaceId
+      )
+    ]);
+  }
+
+  async flushAll(): Promise<void> {
+    const promises: Promise<void>[] = [];
+    for (const nodeId of this.docs.keys()) {
+      promises.push(
+        this.flushDoc(nodeId).catch((err) =>
+          this.logger.error(`Safety flush failed for ${nodeId}`, err)
+        )
+      );
+    }
+    await Promise.all(promises);
+  }
+
+  // ── 정리 ─────────────────────────────────────────────────────
+
+  private evictDoc(nodeId: string): void {
+    const managed = this.docs.get(nodeId);
+    if (!managed) return;
+
+    // 클라이언트가 다시 붙었으면 evict 취소
+    if (managed.clients.size > 0) return;
+
+    if (managed.saveTimer) clearTimeout(managed.saveTimer);
+    if (managed.idleTimer) clearTimeout(managed.idleTimer);
+    managed.doc.destroy();
+    this.docs.delete(nodeId);
+    this.logger.debug(`Evicted doc ${nodeId} from memory`);
+  }
+
+  /** 노드 삭제 시 호출: 메모리 + Redis 정리 */
+  async cleanupNode(nodeId: string): Promise<void> {
+    const managed = this.docs.get(nodeId);
+    if (managed) {
+      if (managed.saveTimer) clearTimeout(managed.saveTimer);
+      if (managed.idleTimer) clearTimeout(managed.idleTimer);
+      managed.doc.destroy();
+      this.docs.delete(nodeId);
+    }
+    await this.crdtService.deleteFromRedis(nodeId);
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    clearInterval(this.flushInterval);
+    await this.flushAll();
+    for (const [, managed] of this.docs) {
+      managed.doc.destroy();
+    }
+    this.docs.clear();
+    this.logger.log('All Yjs docs flushed and destroyed');
+  }
+}
