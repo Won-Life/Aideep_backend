@@ -10,7 +10,6 @@ import {
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { Logger } from '@nestjs/common';
-import * as Y from 'yjs';
 import * as syncProtocol from 'y-protocols/sync';
 import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
@@ -84,6 +83,7 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() payload: { workspaceId: string },
     @ConnectedSocket() client: Socket
   ) {
+    this.logger.debug('조인완료');
     client.join(payload.workspaceId);
     client.data.workspaceId = payload.workspaceId;
   }
@@ -125,15 +125,22 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const userId = client.data.userId;
     const workspaceId = client.data.workspaceId;
 
+    this.logger.debug(workspaceId);
+
     if (!userId || !workspaceId) {
       return { ok: false, error: 'join_workspace 먼저 호출하세요' };
     }
 
-    // 권한 확인
-    const membership = await this.workspaceRepository.checkWorkspace(
-      userId,
-      workspaceId
-    );
+    // 권한 확인 (소켓당 캐시 - 동일 연결에서 반복 DB 조회 방지)
+    let membership = client.data.membershipCache?.[workspaceId];
+    if (membership === undefined) {
+      membership = await this.workspaceRepository.checkWorkspace(
+        userId,
+        workspaceId
+      );
+      client.data.membershipCache = client.data.membershipCache ?? {};
+      client.data.membershipCache[workspaceId] = membership ?? null;
+    }
     if (!membership) {
       return { ok: false, error: '워크스페이스 멤버가 아닙니다' };
     }
@@ -154,12 +161,17 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
     this.yjsRooms.get(client.id)!.add(nodeId);
 
-    // SyncStep1 전송: 서버의 state vector를 클라이언트에 전달
-    const encoder = encoding.createEncoder();
-    syncProtocol.writeSyncStep1(encoder, doc);
+    // nodeId별 readOnly 상태 저장
+    client.data.yjsReadOnly = client.data.yjsReadOnly ?? {};
+    client.data.yjsReadOnly[nodeId] = readOnly;
+
+    // SyncStep1만 전송: 클라이언트가 자신의 SyncStep2로 응답하면
+    // handleYjsSync에서 서버의 SyncStep2를 보내는 표준 핸드셰이크 흐름
+    const encoder1 = encoding.createEncoder();
+    syncProtocol.writeSyncStep1(encoder1, doc);
     client.emit(YJS_EVENT.SYNC, {
       nodeId,
-      data: Buffer.from(encoding.toUint8Array(encoder))
+      data: Array.from(encoding.toUint8Array(encoder1))
     });
 
     return { ok: true, readOnly };
@@ -193,18 +205,18 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (encoding.length(encoder) > 0) {
       client.emit(YJS_EVENT.SYNC, {
         nodeId,
-        data: Buffer.from(encoding.toUint8Array(encoder))
+        data: Array.from(encoding.toUint8Array(encoder))
       });
     }
 
-    // Update 메시지(messageType === 2)면 다른 클라이언트에 브로드캐스트 + 서버 doc에 적용
+    // Update 메시지(messageType === 2)면 다른 클라이언트에 브로드캐스트
+    // readSyncMessage가 이미 doc에 적용했으므로 scheduleSave만 호출
     if (messageType === 2) {
       // VIEWER면 update 차단
-      const membership = client.data.yjsReadOnly;
-      if (membership) return;
+      if (client.data.yjsReadOnly?.[nodeId]) return;
 
       client.to(yjsRoom(nodeId)).emit(YJS_EVENT.SYNC, { nodeId, data });
-      this.yjsDocManager.applyUpdate(nodeId, update);
+      this.yjsDocManager.scheduleSave(nodeId);
     }
   }
 

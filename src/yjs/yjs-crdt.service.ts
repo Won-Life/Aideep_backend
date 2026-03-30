@@ -19,17 +19,16 @@ export class YjsCrdtService {
       .get(REDIS_KEYS.YJS_DOC(nodeId))
       .catch(() => null);
 
-    if (!data) return null;
-    if (Buffer.isBuffer(data)) return data;
-    // node-redis v5는 기본 string 반환 — latin1로 디코딩하여 바이너리 보존
-    if (typeof data === 'string') return Buffer.from(data, 'latin1');
-    return null;
+    if (!data || typeof data !== 'string') return null;
+    return Buffer.from(data, 'base64');
   }
 
   async saveToRedis(nodeId: string, state: Buffer): Promise<void> {
     await this.redis
       .getClient()
-      .set(REDIS_KEYS.YJS_DOC(nodeId), state as any, { EX: 86_400 }); // 24h TTL
+      .set(REDIS_KEYS.YJS_DOC(nodeId), state.toString('base64'), {
+        EX: 86_400
+      }); // 24h TTL
   }
 
   async deleteFromRedis(nodeId: string): Promise<void> {
@@ -61,7 +60,8 @@ export class YjsCrdtService {
 
     if (markdownBody && typeof markdownBody === 'string') {
       const doc = new Y.Doc();
-      doc.getText('content').insert(0, markdownBody);
+      const xmlText = doc.get('root', Y.XmlText);
+      xmlText.insert(0, markdownBody);
       const state = Buffer.from(Y.encodeStateAsUpdate(doc));
       doc.destroy();
       return { state, workspaceId: node.workspace_id };

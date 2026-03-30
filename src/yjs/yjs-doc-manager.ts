@@ -21,6 +21,7 @@ export class YjsDocManager implements OnModuleDestroy {
   private readonly logger = new Logger(YjsDocManager.name);
   private readonly docs = new Map<string, ManagedDoc>();
   private readonly loading = new Map<string, Promise<Y.Doc>>();
+
   private flushInterval: ReturnType<typeof setInterval>;
 
   constructor(private readonly crdtService: YjsCrdtService) {
@@ -79,8 +80,8 @@ export class YjsDocManager implements OnModuleDestroy {
       );
     }
 
-    // getText('content')가 초기화되도록 보장
-    doc.getText('content');
+    // Lexical CollaborationPlugin이 사용하는 'root' XmlText 타입 초기화 보장
+    doc.get('root', Y.XmlText);
 
     this.docs.set(nodeId, {
       doc,
@@ -132,9 +133,16 @@ export class YjsDocManager implements OnModuleDestroy {
     if (!managed) return;
 
     Y.applyUpdate(managed.doc, update);
+    this.scheduleSave(nodeId);
+  }
+
+  /** doc에 이미 적용된 변경에 대해 debounced save만 예약 */
+  scheduleSave(nodeId: string): void {
+    const managed = this.docs.get(nodeId);
+    if (!managed) return;
+
     managed.lastActivity = Date.now();
 
-    // debounced save
     if (managed.saveTimer) clearTimeout(managed.saveTimer);
     managed.saveTimer = setTimeout(() => {
       this.flushDoc(nodeId).catch((err) =>
@@ -155,7 +163,7 @@ export class YjsDocManager implements OnModuleDestroy {
     }
 
     const state = Buffer.from(Y.encodeStateAsUpdate(managed.doc));
-    const markdownText = managed.doc.getText('content').toString();
+    const markdownText = managed.doc.get('root', Y.XmlText).toString();
 
     await Promise.all([
       this.crdtService.saveToRedis(nodeId, state),
