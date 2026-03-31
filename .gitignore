@@ -66,3 +66,4 @@ mock/mock.ts
 mock/sedd.sql
 
 mock/client/node_modules
+mock/client/dist
