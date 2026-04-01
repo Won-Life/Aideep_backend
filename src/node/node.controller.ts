@@ -23,7 +23,7 @@ import {
   CreateMarkDownNodeBody,
   CreateProjectNodeBody
 } from './dto/createNode.dto';
-import { NodeMoveBody, UpdateMarkdownNodeBody } from './dto/updateNode.dto';
+import { NodeMoveBody, UpdateNodeMetaBody } from './dto/updateNode.dto';
 import { Node } from './node.model';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { ApiSuccessResponse } from 'src/common/response/api-success-response.decorator';
@@ -74,6 +74,7 @@ export class NodeController {
   ) {
     const userId = req.user?.user_id;
     const node = Node.fromMarkDownDto(body, workspaceId, userId);
+    console.log(node);
     const nodeId = await this.nodeService.createMarkdownNode(node);
     return { nodeId };
   }
@@ -94,28 +95,26 @@ export class NodeController {
     return await this.nodeService.queryDetailNode(workspaceId, nodeId, userId);
   }
 
-  @Patch('/:nodeId/md')
+  @Patch('/:nodeId')
   @ApiOperation({
-    summary: '마크다운 노드 수정',
-    description: '마크다운 노드 내용을 수정합니다.'
+    summary: '노드 메타 수정',
+    description:
+      '노드의 제목, 색깔(color/textColor)을 수정합니다. MD 내용은 YJS로 편집하세요.'
   })
-  @ApiParam({
-    name: 'nodeId',
-    description: '노드 아이디'
-  })
+  @ApiParam({ name: 'nodeId', description: '노드 아이디' })
   @ApiSuccessResponse(
     { type: 'string', example: '수정 성공' },
     200,
-    '마크다운 노드 수정 성공'
+    '노드 메타 수정 성공'
   )
-  async modifyMarkdownNode(
+  async updateNodeMeta(
     @Request() req: any,
-    @Body() body: UpdateMarkdownNodeBody,
+    @Body() body: UpdateNodeMetaBody,
     @Param('nodeId') nodeId: string,
     @Param('workspaceId') workspaceId: string
   ) {
     const userId = req.user?.user_id;
-    await this.nodeService.updateNodeBody(userId, nodeId, workspaceId, body);
+    await this.nodeService.updateNodeMeta(userId, nodeId, workspaceId, body);
     return '수정 성공';
   }
 

@@ -5,12 +5,9 @@ import {
   CreateProjectNodeBody
 } from './dto/createNode.dto';
 import { IsUUID } from 'class-validator';
-import { MarkdownBodyDto } from './dto/updateNode.dto';
+import { json } from 'stream/consumers';
 
 const MAX_TITLE_LENGTH = 500;
-const MAX_BODY_LENGTH = 100_000;
-const MAX_PDF_SIZE = 50 * 1024 * 1024; // 50MB
-const ALLOWED_URL_ORIGINS = [process.env.S3_ORIGIN].filter(Boolean);
 
 interface NodeDataBase {
   color: string;
@@ -69,47 +66,6 @@ export class Node {
   }
 
   // ──────────────────────────────────────────
-  // PDF 전용 검증
-  // ──────────────────────────────────────────
-  private static validatePdfFileName(fileName: string) {
-    if (!fileName.toLowerCase().endsWith('.pdf'))
-      throw new BadRequestException('PDF 파일명은 .pdf 확장자여야 합니다.');
-  }
-
-  private static validatePdfFileSize(fileSize: number) {
-    if (fileSize <= 0)
-      throw new BadRequestException('fileSize는 0보다 커야 합니다.');
-    if (fileSize > MAX_PDF_SIZE)
-      throw new BadRequestException(
-        `fileSize는 ${MAX_PDF_SIZE / 1024 / 1024}MB를 초과할 수 없습니다.`
-      );
-  }
-
-  private static validatePdfFileUrl(fileUrl: string) {
-    let url: URL;
-    try {
-      url = new URL(fileUrl);
-    } catch {
-      throw new BadRequestException('fileUrl이 올바른 URL 형식이 아닙니다.');
-    }
-    if (url.protocol !== 'https:')
-      throw new BadRequestException('fileUrl은 https여야 합니다.');
-    if (
-      ALLOWED_URL_ORIGINS.length > 0 &&
-      !ALLOWED_URL_ORIGINS.includes(url.origin)
-    )
-      throw new BadRequestException('허용되지 않은 파일 URL입니다.');
-  }
-
-  private static validateMarkdown(body: MarkdownBodyDto) {
-    const { jsonBody, markdownBody } = body;
-    if (markdownBody.length >= MAX_BODY_LENGTH)
-      throw new BadRequestException(
-        `본문은 ${MAX_BODY_LENGTH}를 초과할 수 없습니다.`
-      );
-  }
-
-  // ──────────────────────────────────────────
   // 팩토리 메서드
   // ──────────────────────────────────────────
   static fromProjectDto(
@@ -135,21 +91,18 @@ export class Node {
     workspaceId: string,
     userId: string
   ): Node {
-    console.log(dto);
     Node.validateTitle(dto.title);
     Node.validatePosition(dto.position);
-    Node.validateMarkdown(dto.body);
-    const { jsonBody, markdownBody, color, textColor } = dto.body;
-
+    const { jsonBody, color, textColor } = dto.body;
     const node = new Node();
     node.workspaceId = workspaceId;
     node.userId = userId;
-    node.title = dto.title.trim();
+    node.title = dto.title.trim() || '제목없음';
     node.nodeType = 'DATA';
     node.position = dto.position;
     node.data = {
       dataType: 'MARKDOWN',
-      markdownBody: markdownBody,
+      markdownBody: '',
       jsonBody: jsonBody,
       color: color,
       textColor: textColor
