@@ -75,14 +75,15 @@ export class Node {
   ): Node {
     Node.validateTitle(dto.title);
     Node.validatePosition(dto.position);
+    const { color, textColor } = dto.body;
 
     const node = new Node();
     node.workspaceId = workspaceId;
     node.userId = userId;
-    node.title = dto.title.trim() || '제목없음';
+    node.title = dto.title.trim() || '';
     node.nodeType = 'PROJECT';
     node.position = dto.position;
-    node.data = { dataType: 'PROJECT', color: '#ffffff', textColor: '#000000' };
+    node.data = { dataType: 'PROJECT', color: color, textColor: textColor };
     return node;
   }
 
@@ -93,16 +94,17 @@ export class Node {
   ): Node {
     Node.validateTitle(dto.title);
     Node.validatePosition(dto.position);
-    const { jsonBody, color, textColor } = dto.body;
+    const { jsonBody, markdownBody, color, textColor } = dto.body;
+
     const node = new Node();
     node.workspaceId = workspaceId;
     node.userId = userId;
-    node.title = dto.title.trim() || '제목없음';
+    node.title = dto.title.trim() || '';
     node.nodeType = 'DATA';
     node.position = dto.position;
     node.data = {
       dataType: 'MARKDOWN',
-      markdownBody: '',
+      markdownBody: markdownBody,
       jsonBody: jsonBody,
       color: color,
       textColor: textColor

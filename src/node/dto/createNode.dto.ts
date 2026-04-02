@@ -15,6 +15,13 @@ export class MarkDownBody {
   @IsString()
   textColor: string;
 }
+export class ProjectBody {
+  @IsString()
+  color: string;
+
+  @IsString()
+  textColor: string;
+}
 
 export class PositionDto {
   @ApiProperty({ example: 100 })
@@ -35,6 +42,11 @@ export class CreateProjectNodeBody {
   @ValidateNested()
   @Type(() => PositionDto)
   position: PositionDto;
+
+  @ApiProperty({ type: ProjectBody })
+  @ValidateNested()
+  @Type(() => ProjectBody)
+  body: ProjectBody;
 }
 
 export class CreateMarkDownNodeBody {
