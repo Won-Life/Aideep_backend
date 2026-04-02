@@ -9,17 +9,35 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
+import { Logger } from '@nestjs/common';
+import * as syncProtocol from 'y-protocols/sync';
+import * as encoding from 'lib0/encoding';
+import * as decoding from 'lib0/decoding';
 import { WsEvent } from './ws.event';
+import { YjsDocManager } from '../yjs/yjs-doc-manager';
+import { WorkspaceRepository } from '../workspace/workspace.repository';
+import { YJS_EVENT, yjsRoom } from '../yjs/yjs.constants';
 
 @WebSocketGateway({
   cors: { origin: '*' },
   namespace: '/workspace'
 })
 export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
+  private readonly logger = new Logger(WsGateway.name);
+
   @WebSocketServer()
   server: Server;
 
-  constructor(private readonly jwtService: JwtService) {}
+  /** socketId → 참여 중인 yjs nodeId 집합 */
+  private readonly yjsRooms = new Map<string, Set<string>>();
+
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly yjsDocManager: YjsDocManager,
+    private readonly workspaceRepository: WorkspaceRepository
+  ) {}
+
+  // ── 연결 / 해제 ───────────────────────────────────────────────
 
   async handleConnection(client: Socket) {
     const token =
@@ -40,11 +58,32 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  handleDisconnect(client: Socket) {
+    const workspaceId = client.data?.workspaceId;
+    if (workspaceId) {
+      client.to(workspaceId).emit('cursor_leave', {
+        userId: client.data.userId
+      });
+    }
+
+    // Yjs cleanup: 모든 참여 중인 doc에서 제거
+    const nodeIds = this.yjsRooms.get(client.id);
+    if (nodeIds) {
+      for (const nodeId of nodeIds) {
+        this.yjsDocManager.removeClient(nodeId, client.id);
+      }
+      this.yjsRooms.delete(client.id);
+    }
+  }
+
+  // ── 기존 이벤트 (변경 없음) ───────────────────────────────────
+
   @SubscribeMessage('join_workspace')
   handleJoin(
     @MessageBody() payload: { workspaceId: string },
     @ConnectedSocket() client: Socket
   ) {
+    this.logger.debug('조인완료');
     client.join(payload.workspaceId);
     client.data.workspaceId = payload.workspaceId;
   }
@@ -76,16 +115,145 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
-  handleDisconnect(client: Socket) {
-    const workspaceId = client.data?.workspaceId;
-    if (!workspaceId) return;
+  // ── Yjs CRDT 이벤트 ──────────────────────────────────────────
 
-    client.to(workspaceId).emit('cursor_leave', {
-      userId: client.data.userId
+  @SubscribeMessage(YJS_EVENT.JOIN)
+  async handleYjsJoin(
+    @MessageBody() payload: { nodeId: string },
+    @ConnectedSocket() client: Socket
+  ) {
+    const userId = client.data.userId;
+    const workspaceId = client.data.workspaceId;
+
+    this.logger.debug(workspaceId);
+
+    if (!userId || !workspaceId) {
+      return { ok: false, error: 'join_workspace 먼저 호출하세요' };
+    }
+
+    // 권한 확인 (소켓당 캐시 - 동일 연결에서 반복 DB 조회 방지)
+    let membership = client.data.membershipCache?.[workspaceId];
+    if (membership === undefined) {
+      membership = await this.workspaceRepository.checkWorkspace(
+        userId,
+        workspaceId
+      );
+      client.data.membershipCache = client.data.membershipCache ?? {};
+      client.data.membershipCache[workspaceId] = membership ?? null;
+    }
+    if (!membership) {
+      return { ok: false, error: '워크스페이스 멤버가 아닙니다' };
+    }
+
+    const readOnly = membership.role === 'VIEWER';
+    const { nodeId } = payload;
+
+    // Doc 로드/생성
+    const doc = await this.yjsDocManager.getOrCreateDoc(nodeId, workspaceId);
+
+    // Room join + 클라이언트 등록
+    client.join(yjsRoom(nodeId));
+    this.yjsDocManager.addClient(nodeId, client.id);
+
+    // 소켓별 yjs room 추적
+    if (!this.yjsRooms.has(client.id)) {
+      this.yjsRooms.set(client.id, new Set());
+    }
+    this.yjsRooms.get(client.id)!.add(nodeId);
+
+    // nodeId별 readOnly 상태 저장
+    client.data.yjsReadOnly = client.data.yjsReadOnly ?? {};
+    client.data.yjsReadOnly[nodeId] = readOnly;
+
+    // SyncStep1만 전송: 클라이언트가 자신의 SyncStep2로 응답하면
+    // handleYjsSync에서 서버의 SyncStep2를 보내는 표준 핸드셰이크 흐름
+    const encoder1 = encoding.createEncoder();
+    syncProtocol.writeSyncStep1(encoder1, doc);
+    client.emit(YJS_EVENT.SYNC, {
+      nodeId,
+      data: Array.from(encoding.toUint8Array(encoder1))
     });
+
+    return { ok: true, readOnly };
   }
+
+  @SubscribeMessage(YJS_EVENT.SYNC)
+  handleYjsSync(
+    @MessageBody() payload: { nodeId: string; data: Buffer },
+    @ConnectedSocket() client: Socket
+  ) {
+    const { nodeId, data } = payload;
+    const managed = this.yjsDocManager['docs']?.get(nodeId);
+    if (!managed) return;
+
+    const update = new Uint8Array(
+      Buffer.isBuffer(data)
+        ? data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)
+        : data
+    );
+
+    const decoder = decoding.createDecoder(update);
+    const encoder = encoding.createEncoder();
+    const messageType = syncProtocol.readSyncMessage(
+      decoder,
+      encoder,
+      managed.doc,
+      null
+    );
+
+    // 응답이 있으면 (SyncStep2) 요청자에게 전송
+    if (encoding.length(encoder) > 0) {
+      client.emit(YJS_EVENT.SYNC, {
+        nodeId,
+        data: Array.from(encoding.toUint8Array(encoder))
+      });
+    }
+
+    // Update 메시지(messageType === 2)면 다른 클라이언트에 브로드캐스트
+    // readSyncMessage가 이미 doc에 적용했으므로 scheduleSave만 호출
+    if (messageType === 2) {
+      // VIEWER면 update 차단
+      if (client.data.yjsReadOnly?.[nodeId]) return;
+
+      client.to(yjsRoom(nodeId)).emit(YJS_EVENT.SYNC, { nodeId, data });
+      this.yjsDocManager.scheduleSave(nodeId);
+    }
+  }
+
+  @SubscribeMessage(YJS_EVENT.AWARENESS)
+  handleYjsAwareness(
+    @MessageBody() payload: { nodeId: string; data: Buffer },
+    @ConnectedSocket() client: Socket
+  ) {
+    client.to(yjsRoom(payload.nodeId)).emit(YJS_EVENT.AWARENESS, payload);
+  }
+
+  @SubscribeMessage(YJS_EVENT.LEAVE)
+  handleYjsLeave(
+    @MessageBody() payload: { nodeId: string },
+    @ConnectedSocket() client: Socket
+  ) {
+    const { nodeId } = payload;
+    client.leave(yjsRoom(nodeId));
+    this.yjsDocManager.removeClient(nodeId, client.id);
+
+    const rooms = this.yjsRooms.get(client.id);
+    if (rooms) {
+      rooms.delete(nodeId);
+      if (rooms.size === 0) this.yjsRooms.delete(client.id);
+    }
+  }
+
+  // ── Broadcast (REST → WS) ────────────────────────────────────
 
   broadcast(event: WsEvent): void {
     this.server.to(event.workspaceId).emit('workspace_event', event);
+
+    // 노드 삭제 시 Yjs doc 정리
+    if (event.type === 'NODE_DELETE') {
+      this.yjsDocManager.cleanupNode(event.nodeId).catch((err) => {
+        this.logger.error(`Yjs cleanup failed for ${event.nodeId}`, err);
+      });
+    }
   }
 }

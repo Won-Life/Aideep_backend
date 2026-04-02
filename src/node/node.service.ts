@@ -15,7 +15,7 @@ import {
 } from 'src/ws/ws.event';
 import { RedisService } from 'src/redis/redis.service';
 import { REDIS_KEYS } from 'src/redis/redis.keys';
-import { NodeMoveBody, UpdateMarkdownNodeBody } from './dto/updateNode.dto';
+import { NodeMoveBody, UpdateNodeMetaBody } from './dto/updateNode.dto';
 import { Transactional } from 'src/prisma/transactional.decorator';
 
 @Injectable()
@@ -195,13 +195,14 @@ export class NodeService {
     } as NodeMoveEvent);
   }
 
-  async updateNodeBody(
+  //TODO: 로직 수정
+  async updateNodeMeta(
     userId: string,
     nodeId: string,
     workspaceId: string,
-    body: UpdateMarkdownNodeBody
+    body: UpdateNodeMetaBody
   ) {
-    const { title, body: dto } = body;
+    const { title, color, textColor } = body;
     await this.checkEditPermission(userId, workspaceId);
 
     const existing = await this.nodeRespository.selectNodeById(
@@ -210,14 +211,11 @@ export class NodeService {
     );
     if (!existing) throw new NotFoundException('노드를 찾을 수 없습니다.');
 
-    // 2. 기존 content에 변경값만 머지
     const currentContent = existing.content as Record<string, any>;
     const updatedContent = {
       ...currentContent,
-      ...(dto?.markdownBody !== undefined && {
-        markdownBody: dto.markdownBody
-      }),
-      ...(dto?.jsonBody !== undefined && { jsonBody: dto.jsonBody })
+      ...(color !== undefined && { color }),
+      ...(textColor !== undefined && { textColor })
     };
 
     await this.nodeRespository.updateNode(workspaceId, nodeId, {
@@ -231,7 +229,8 @@ export class NodeService {
 
     const patch: Record<string, any> = {};
     if (title !== undefined) patch.title = title;
-    if (dto !== undefined) patch.data = updatedContent;
+    if (color !== undefined || textColor !== undefined)
+      patch.data = updatedContent;
 
     this.wsGateway.broadcast({
       type: 'NODE_UPDATE',

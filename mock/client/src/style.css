@@ -1,0 +1,464 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #0f0f0f;
+  color: #e0e0e0;
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+h1 {
+  font-size: 20px;
+  margin-bottom: 16px;
+  color: #fff;
+}
+
+/* ── Connection Panel ── */
+.connect-panel {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.connect-panel input {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  color: #e0e0e0;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.connect-panel input:focus {
+  outline: none;
+  border-color: #646cff;
+}
+
+.connect-panel button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-connect {
+  background: #646cff;
+  color: #fff;
+}
+
+.btn-connect:hover {
+  background: #535bf2;
+}
+
+.btn-disconnect {
+  background: #ff4444;
+  color: #fff;
+}
+
+.btn-disconnect:hover {
+  background: #cc3333;
+}
+
+/* ── Status ── */
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-dot.connected {
+  background: #4caf50;
+}
+
+.status-dot.disconnected {
+  background: #ff4444;
+}
+
+/* ── Users Panel ── */
+.users-panel {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.users-label {
+  font-size: 12px;
+  color: #888;
+  margin-right: 4px;
+}
+
+.user-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.user-badge .cursor-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.user-badge.me {
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* ── Editor Wrapper ── */
+.editor-wrapper {
+  border: 1px solid #333;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #1a1a1a;
+}
+
+.editor-container {
+  min-height: 400px;
+  padding: 16px;
+  font-size: 15px;
+  line-height: 1.6;
+  outline: none;
+  color: #e0e0e0;
+  position: relative;
+}
+
+/* ── NotionEditor Wrapper ── */
+.ne-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  background: #1a1a1a;
+  border-radius: 0 0 8px 8px;
+}
+
+/* ── Toolbar ── */
+.ne-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px;
+  border-bottom: 1px solid #333;
+  background: #1e1e1e;
+  flex-wrap: wrap;
+}
+
+.tb-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.tb-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #aaa;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.12s;
+  min-width: 28px;
+  text-align: center;
+}
+
+.tb-btn:hover {
+  background: #2a2a2a;
+  color: #e0e0e0;
+}
+
+.tb-btn.tb-active {
+  background: #333;
+  color: #646cff;
+  border-color: #444;
+}
+
+.tb-divider {
+  width: 1px;
+  height: 18px;
+  background: #333;
+  margin: 0 4px;
+}
+
+.tb-spacer {
+  flex: 1;
+}
+
+.tb-block-label {
+  font-size: 11px;
+  color: #666;
+  padding: 4px 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ── Editor Content Area ── */
+.ne-editor-scroll {
+  position: relative;
+  flex: 1;
+  min-height: 350px;
+  overflow-y: auto;
+}
+
+.ne-root {
+  padding: 16px;
+  font-size: 15px;
+  line-height: 1.7;
+  color: #e0e0e0;
+  outline: none;
+  min-height: 350px;
+}
+
+.ne-placeholder {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  color: #666;
+  pointer-events: none;
+  user-select: none;
+  font-size: 13px;
+}
+
+/* ── Lexical Theme Classes ── */
+
+.ne-paragraph {
+  margin-bottom: 8px;
+}
+
+.ne-h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  margin: 20px 0 8px;
+  line-height: 1.3;
+}
+
+.ne-h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #f0f0f0;
+  margin: 16px 0 6px;
+  line-height: 1.3;
+}
+
+.ne-h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #e8e8e8;
+  margin: 12px 0 4px;
+  line-height: 1.4;
+}
+
+.ne-bold {
+  font-weight: 700;
+}
+
+.ne-italic {
+  font-style: italic;
+}
+
+.ne-underline {
+  text-decoration: underline;
+}
+
+.ne-strikethrough {
+  text-decoration: line-through;
+}
+
+.ne-inline-code {
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-family: 'SF Mono', Monaco, 'Fira Code', monospace;
+  font-size: 0.9em;
+  color: #e06c75;
+}
+
+.ne-blockquote {
+  border-left: 3px solid #646cff;
+  padding: 4px 16px;
+  margin: 8px 0;
+  color: #999;
+  font-style: italic;
+}
+
+.ne-code-block {
+  background: #111;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin: 8px 0;
+  font-family: 'SF Mono', Monaco, 'Fira Code', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-x: auto;
+  color: #abb2bf;
+}
+
+.ne-ul {
+  list-style: disc;
+  padding-left: 24px;
+  margin: 4px 0;
+}
+
+.ne-ol {
+  list-style: decimal;
+  padding-left: 24px;
+  margin: 4px 0;
+}
+
+.ne-li {
+  margin: 2px 0;
+}
+
+.ne-li-nested {
+  list-style: circle;
+}
+
+.ne-link {
+  color: #646cff;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.ne-link:hover {
+  color: #535bf2;
+}
+
+/* ── Code highlight tokens ── */
+.ne-token-comment { color: #5c6370; font-style: italic; }
+.ne-token-keyword { color: #c678dd; }
+.ne-token-string { color: #98c379; }
+.ne-token-number { color: #d19a66; }
+.ne-token-boolean { color: #d19a66; }
+.ne-token-function { color: #61afef; }
+.ne-token-class-name { color: #e5c07b; }
+.ne-token-operator { color: #56b6c2; }
+.ne-token-punctuation { color: #abb2bf; }
+.ne-token-property { color: #e06c75; }
+.ne-token-tag { color: #e06c75; }
+.ne-token-attr { color: #d19a66; }
+.ne-token-selector { color: #e06c75; }
+.ne-token-regex { color: #98c379; }
+.ne-token-variable { color: #e06c75; }
+.ne-token-builtin { color: #e5c07b; }
+.ne-token-constant { color: #d19a66; }
+.ne-token-symbol { color: #56b6c2; }
+.ne-token-inserted { color: #98c379; }
+.ne-token-deleted { color: #e06c75; }
+.ne-token-important { color: #c678dd; font-weight: bold; }
+.ne-token-atrule { color: #c678dd; }
+.ne-token-char { color: #98c379; }
+.ne-token-cdata { color: #5c6370; }
+.ne-token-doctype { color: #5c6370; }
+.ne-token-entity { color: #e06c75; }
+.ne-token-namespace { color: #e5c07b; }
+.ne-token-prolog { color: #5c6370; }
+.ne-token-url { color: #56b6c2; }
+.ne-token-class { color: #e5c07b; }
+
+/* ── Debug Panel ── */
+.ne-debug {
+  border-top: 1px solid #333;
+  background: #111;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.ne-debug-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: #666;
+  padding: 6px 12px;
+  border-bottom: 1px solid #222;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ne-debug-content {
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 11px;
+  color: #888;
+  padding: 8px 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* ── Remote Cursors ── */
+.yjs-cursor {
+  border-left: 2px solid;
+  position: relative;
+}
+
+.yjs-cursor-label {
+  position: absolute;
+  top: -18px;
+  left: -1px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  white-space: nowrap;
+  color: #fff;
+  pointer-events: none;
+}
+
+/* ── Log Panel ── */
+.log-panel {
+  margin-top: 16px;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #111;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 8px 12px;
+}
+
+.log-panel h3 {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+.log-entry {
+  font-size: 11px;
+  font-family: 'SF Mono', Monaco, monospace;
+  color: #aaa;
+  padding: 2px 0;
+  border-bottom: 1px solid #1a1a1a;
+}
+
+.log-entry .timestamp {
+  color: #555;
+  margin-right: 6px;
+}

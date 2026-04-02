@@ -1,7 +1,27 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsNumber, IsString, IsUrl, ValidateNested } from 'class-validator';
-import { MarkdownBodyDto } from './updateNode.dto';
+
+export class MarkDownBody {
+  @IsString()
+  jsonBody: string;
+
+  @IsString()
+  markdownBody: string;
+
+  @IsString()
+  color: string;
+
+  @IsString()
+  textColor: string;
+}
+export class ProjectBody {
+  @IsString()
+  color: string;
+
+  @IsString()
+  textColor: string;
+}
 
 export class PositionDto {
   @ApiProperty({ example: 100 })
@@ -22,6 +42,11 @@ export class CreateProjectNodeBody {
   @ValidateNested()
   @Type(() => PositionDto)
   position: PositionDto;
+
+  @ApiProperty({ type: ProjectBody })
+  @ValidateNested()
+  @Type(() => ProjectBody)
+  body: ProjectBody;
 }
 
 export class CreateMarkDownNodeBody {
@@ -34,10 +59,10 @@ export class CreateMarkDownNodeBody {
   @Type(() => PositionDto)
   position: PositionDto;
 
-  @ApiProperty({ type: MarkdownBodyDto })
+  @ApiProperty({ type: MarkDownBody })
   @ValidateNested()
-  @Type(() => MarkdownBodyDto)
-  body: MarkdownBodyDto;
+  @Type(() => MarkDownBody)
+  body: MarkDownBody;
 }
 
 class PdfDataDto {
