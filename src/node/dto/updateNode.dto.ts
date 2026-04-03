@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsDefined,
   IsNumber,
   IsOptional,
@@ -33,6 +34,11 @@ export class UpdateNodeMetaBody {
   @IsOptional()
   @IsString()
   textColor?: string;
+
+  @ApiProperty({ required: false, default: false })
+  @IsOptional()
+  @IsBoolean()
+  propagateToChildren?: boolean;
 }
 
 export class NodeMoveBody {
