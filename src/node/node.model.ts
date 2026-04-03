@@ -4,8 +4,9 @@ import {
   CreatePdfNodeBody,
   CreateProjectNodeBody
 } from './dto/createNode.dto';
-import { IsUUID } from 'class-validator';
+import { IsEnum, IsString, IsUUID } from 'class-validator';
 import { json } from 'stream/consumers';
+import { node_type_enum } from '@prisma/client';
 
 const MAX_TITLE_LENGTH = 500;
 
@@ -43,8 +44,12 @@ export class Node {
   @IsUUID()
   userId: string;
 
+  @IsString()
   title: string;
-  nodeType: 'DATA' | 'PROJECT' | 'RESOURCE' | 'ARCHIVE';
+
+  @IsEnum(node_type_enum)
+  nodeType: node_type_enum;
+
   position: { x: number; y: number };
   data: NodeData;
 
@@ -80,8 +85,8 @@ export class Node {
     const node = new Node();
     node.workspaceId = workspaceId;
     node.userId = userId;
-    node.title = dto.title.trim() || '';
-    node.nodeType = 'PROJECT';
+    node.title = dto.title || '';
+    node.nodeType = node_type_enum.PROJECT;
     node.position = dto.position;
     node.data = { dataType: 'PROJECT', color: color, textColor: textColor };
     return node;
@@ -99,7 +104,7 @@ export class Node {
     const node = new Node();
     node.workspaceId = workspaceId;
     node.userId = userId;
-    node.title = dto.title.trim() || '';
+    node.title = dto.title || '';
     node.nodeType = 'DATA';
     node.position = dto.position;
     node.data = {

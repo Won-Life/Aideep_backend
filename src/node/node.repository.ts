@@ -154,6 +154,16 @@ export class NodeRepository {
     return rows.map((r) => r.node_id);
   }
 
+  async selectNodesByIds(workspaceId: string, nodeIds: string[]) {
+    return this.prisma.client.nodes.findMany({
+      where: {
+        node_id: { in: nodeIds },
+        workspace_id: workspaceId,
+        deleted_at: null
+      }
+    });
+  }
+
   async updateNodePositionDelta(
     workspaceId: string,
     nodeIds: string[],

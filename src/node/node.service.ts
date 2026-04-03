@@ -202,7 +202,7 @@ export class NodeService {
     workspaceId: string,
     body: UpdateNodeMetaBody
   ) {
-    const { title, color, textColor } = body;
+    const { title, color, textColor, propagateToChildren } = body;
     await this.checkEditPermission(userId, workspaceId);
 
     const existing = await this.nodeRespository.selectNodeById(
@@ -239,6 +239,42 @@ export class NodeService {
       userId: userId,
       patch
     });
+
+    // 자식 노드 색상 전파
+    if (propagateToChildren && (color !== undefined || textColor !== undefined)) {
+      const descendantIds = await this.nodeRespository.selectAllDescendantIds(
+        workspaceId,
+        nodeId
+      );
+
+      if (descendantIds.length > 0) {
+        const descendants = await this.nodeRespository.selectNodesByIds(
+          workspaceId,
+          descendantIds
+        );
+
+        for (const descendant of descendants) {
+          const descContent = (descendant.content as Record<string, any>) ?? {};
+          const descUpdatedContent = {
+            ...descContent,
+            ...(color !== undefined && { color }),
+            ...(textColor !== undefined && { textColor })
+          };
+
+          await this.nodeRespository.updateNode(workspaceId, descendant.node_id, {
+            content: descUpdatedContent
+          });
+
+          this.wsGateway.broadcast({
+            type: 'NODE_UPDATE',
+            workspaceId,
+            nodeId: descendant.node_id,
+            userId,
+            patch: { data: descUpdatedContent }
+          });
+        }
+      }
+    }
   }
 
   @Transactional()
