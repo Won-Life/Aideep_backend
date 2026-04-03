@@ -24,12 +24,12 @@ export class UpdateNodeMetaBody {
   @IsString()
   title?: string;
 
-  @ApiProperty({ example: '#ffffff', required: false })
+  @ApiProperty({ example: 'rgb(var(--ds-sub-white))', required: false })
   @IsOptional()
   @IsString()
   color?: string;
 
-  @ApiProperty({ example: '#000000', required: false })
+  @ApiProperty({ example: 'rgb(var(--ds-sub-black))', required: false })
   @IsOptional()
   @IsString()
   textColor?: string;

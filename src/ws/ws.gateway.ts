@@ -4,10 +4,12 @@ import {
   SubscribeMessage,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  OnGatewayInit,
   MessageBody,
   ConnectedSocket
 } from '@nestjs/websockets';
-import { Server, Socket } from 'socket.io';
+import { Server, Namespace, Socket } from 'socket.io';
+import { instrument } from '@socket.io/admin-ui';
 import { JwtService } from '@nestjs/jwt';
 import { Logger } from '@nestjs/common';
 import * as syncProtocol from 'y-protocols/sync';
@@ -22,7 +24,7 @@ import { YJS_EVENT, yjsRoom } from '../yjs/yjs.constants';
   cors: { origin: '*' },
   namespace: '/workspace'
 })
-export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class WsGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(WsGateway.name);
 
   @WebSocketServer()
@@ -36,6 +38,15 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly yjsDocManager: YjsDocManager,
     private readonly workspaceRepository: WorkspaceRepository
   ) {}
+
+  // ── 초기화 ────────────────────────────────────────────────────
+
+  afterInit(server: Namespace) {
+    instrument(server.server, {
+      auth: false,
+      mode: 'development',
+    });
+  }
 
   // ── 연결 / 해제 ───────────────────────────────────────────────
 
