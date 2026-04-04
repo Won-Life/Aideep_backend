@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { WsGateway } from './ws.gateway';
 import { JwtService } from '@nestjs/jwt';
+import { YjsDocManager } from '../yjs/yjs-doc-manager';
+import { YjsWsAwarenessService } from '../yjs/yjs-ws-awareness.service';
+import { WorkspaceRepository } from '../workspace/workspace.repository';
 import { Socket, Server } from 'socket.io';
 
 describe('WsGateway', () => {
@@ -15,6 +18,30 @@ describe('WsGateway', () => {
           provide: JwtService,
           useValue: {
             verify: jest.fn(),
+          },
+        },
+        {
+          provide: YjsDocManager,
+          useValue: {
+            getOrCreateDoc: jest.fn(),
+            addClient: jest.fn(),
+            removeClient: jest.fn(),
+            scheduleSave: jest.fn(),
+            cleanupNode: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: YjsWsAwarenessService,
+          useValue: {
+            getCachedAwareness: jest.fn().mockResolvedValue(null),
+            cacheAwareness: jest.fn().mockResolvedValue(undefined),
+            deleteAwareness: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: WorkspaceRepository,
+          useValue: {
+            checkWorkspace: jest.fn(),
           },
         },
       ],
@@ -94,13 +121,16 @@ describe('WsGateway', () => {
   });
 
   describe('handleJoin', () => {
-    it('should join the client to the workspace room', () => {
+    it('should join the client to the workspace room and awareness room', async () => {
       const client = {
         join: jest.fn(),
+        emit: jest.fn(),
+        data: {},
       } as unknown as Socket;
 
-      gateway.handleJoin({ workspaceId: 'ws-abc' }, client);
+      await gateway.handleJoin({ workspaceId: 'ws-abc' }, client);
       expect(client.join).toHaveBeenCalledWith('ws-abc');
+      expect(client.join).toHaveBeenCalledWith('yjs:ws:ws-abc');
     });
   });
 
