@@ -225,7 +225,7 @@ export class NodeRepository {
   async increasDepth(nodeId: string, increase: number) {
     await this.prisma.client.nodes.update({
       where: { node_id: nodeId },
-      data: { depth: { increment: increase + 1 } }
+      data: { depth: { increment: increase } }
     });
   }
 

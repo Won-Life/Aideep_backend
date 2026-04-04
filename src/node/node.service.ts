@@ -284,13 +284,14 @@ export class NodeService {
     }
   }
 
-  async propagateDepthIncrease(
+  async propagateDepth(
     workspaceId: string,
     targetId: string,
-    sourceDepth: number
+    sourceDepth: number,
+    increase: boolean
   ) {
-    const depthIncrease = sourceDepth + 1;
-    await this.nodeRespository.increasDepth(targetId, sourceDepth);
+    const depth = increase ? sourceDepth + 1 : -sourceDepth;
+    await this.nodeRespository.increasDepth(targetId, depth);
 
     const descendantIds = await this.nodeRespository.selectAllDescendantIds(
       workspaceId,
@@ -301,7 +302,7 @@ export class NodeService {
       await this.nodeRespository.increaseDepthMany(
         workspaceId,
         descendantIds,
-        depthIncrease
+        depth
       );
     }
   }

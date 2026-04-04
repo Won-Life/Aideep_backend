@@ -124,10 +124,11 @@ export class EdgeService {
     if (this.hasCycle(dto.sourceId, dto.targetId, allEdges))
       throw new BadRequestException('순환 관계가 생성됩니다.');
 
-    await this.nodeService.propagateDepthIncrease(
+    await this.nodeService.propagateDepth(
       dto.workspaceId,
       dto.targetId,
-      source.depth!
+      source.depth!,
+      true
     );
     const result = await this.edgeRepository.createEdge(dto);
 
@@ -157,6 +158,19 @@ export class EdgeService {
     const isExist = await this.edgeRepository.findEdgeById(edgeId);
     if (!isExist) throw new NotFoundException('해당 엣지가 존재하지 않습니다.');
 
+    const { source_id, target_id } = isExist;
+
+    const source = await this.nodeRepository.selectNodeById(
+      workspaceId,
+      target_id
+    );
+
+    await this.nodeService.propagateDepth(
+      workspaceId,
+      target_id,
+      source!.depth!,
+      false
+    );
     await this.edgeRepository.deleteEdge(edgeId);
     await this.redisService
       .getClient()
