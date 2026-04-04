@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Node } from './node.model';
+import { tree } from 'lib0';
 
 export type RawNodeItem = Prisma.nodesGetPayload<{
   select: {
@@ -16,6 +17,7 @@ export type RawNodeItem = Prisma.nodesGetPayload<{
     position_x: true;
     position_y: true;
     workspace_id: true;
+    depth: true;
   };
 }>;
 
@@ -53,7 +55,8 @@ export class NodeRepository {
         deleted_at: true,
         position_x: true,
         position_y: true,
-        workspace_id: true
+        workspace_id: true,
+        depth: true
       },
       where: {
         workspace_id: workspaceId,
@@ -112,7 +115,8 @@ export class NodeRepository {
         deleted_at: true,
         position_x: true,
         position_y: true,
-        workspace_id: true
+        workspace_id: true,
+        depth: true
       },
       where: { node_id: nodeId, workspace_id: workspaceId, deleted_at: null }
     });
@@ -126,6 +130,7 @@ export class NodeRepository {
         position_x: node.position.x,
         position_y: node.position.y,
         workspace_id: node.workspaceId,
+        depth: node.depth,
         content: node.data as unknown as Prisma.InputJsonValue
       }
     });
@@ -214,6 +219,28 @@ export class NodeRepository {
     await this.prisma.client.nodes.update({
       where: { node_id: nodeId },
       data: { deleted_at: new Date(), updated_at: new Date() }
+    });
+  }
+
+  async increasDepth(nodeId: string, increase: number) {
+    await this.prisma.client.nodes.update({
+      where: { node_id: nodeId },
+      data: { depth: { increment: increase + 1 } }
+    });
+  }
+
+  async increaseDepthMany(
+    workspaceId: string,
+    nodeIds: string[],
+    amount: number
+  ) {
+    await this.prisma.client.nodes.updateMany({
+      where: {
+        node_id: { in: nodeIds },
+        workspace_id: workspaceId,
+        deleted_at: null
+      },
+      data: { depth: { increment: amount } }
     });
   }
 }

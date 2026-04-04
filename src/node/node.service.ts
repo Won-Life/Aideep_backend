@@ -241,7 +241,10 @@ export class NodeService {
     });
 
     // 자식 노드 색상 전파
-    if (propagateToChildren && (color !== undefined || textColor !== undefined)) {
+    if (
+      propagateToChildren &&
+      (color !== undefined || textColor !== undefined)
+    ) {
       const descendantIds = await this.nodeRespository.selectAllDescendantIds(
         workspaceId,
         nodeId
@@ -261,9 +264,13 @@ export class NodeService {
             ...(textColor !== undefined && { textColor })
           };
 
-          await this.nodeRespository.updateNode(workspaceId, descendant.node_id, {
-            content: descUpdatedContent
-          });
+          await this.nodeRespository.updateNode(
+            workspaceId,
+            descendant.node_id,
+            {
+              content: descUpdatedContent
+            }
+          );
 
           this.wsGateway.broadcast({
             type: 'NODE_UPDATE',
@@ -274,6 +281,28 @@ export class NodeService {
           });
         }
       }
+    }
+  }
+
+  async propagateDepthIncrease(
+    workspaceId: string,
+    targetId: string,
+    sourceDepth: number
+  ) {
+    const depthIncrease = sourceDepth + 1;
+    await this.nodeRespository.increasDepth(targetId, sourceDepth);
+
+    const descendantIds = await this.nodeRespository.selectAllDescendantIds(
+      workspaceId,
+      targetId
+    );
+
+    if (descendantIds.length > 0) {
+      await this.nodeRespository.increaseDepthMany(
+        workspaceId,
+        descendantIds,
+        depthIncrease
+      );
     }
   }
 

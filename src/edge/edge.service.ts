@@ -10,6 +10,7 @@ import { EdgeRepository } from './edge.repository';
 import { WorkspaceRepository } from 'src/workspace/workspace.repository';
 import { Transactional } from 'src/prisma/transactional.decorator';
 import { NodeRepository } from 'src/node/node.repository';
+import { NodeService } from 'src/node/node.service';
 import { WsGateway } from 'src/ws/ws.gateway';
 import { EdgeCreateEvent } from 'src/ws/ws.event';
 import { RedisService } from 'src/redis/redis.service';
@@ -22,6 +23,7 @@ export class EdgeService {
     private readonly edgeRepository: EdgeRepository,
     private readonly workspaceRepository: WorkspaceRepository,
     private readonly nodeRepository: NodeRepository,
+    private readonly nodeService: NodeService,
     private readonly wsGateway: WsGateway,
     private readonly redisService: RedisService
   ) {}
@@ -104,6 +106,8 @@ export class EdgeService {
     if (reverseEdge)
       throw new BadRequestException('역방향 엣지가 이미 존재합니다.');
 
+    //Target노드가 부모 노드임
+
     // source 노드의 outgoing 엣지 중복 여부 (source는 하나의 엣지만 허용)
     // const sourceOutgoing = await this.edgeRepository.findEdgesBySource(
     //   dto.sourceId
@@ -120,6 +124,11 @@ export class EdgeService {
     if (this.hasCycle(dto.sourceId, dto.targetId, allEdges))
       throw new BadRequestException('순환 관계가 생성됩니다.');
 
+    await this.nodeService.propagateDepthIncrease(
+      dto.workspaceId,
+      dto.targetId,
+      source.depth!
+    );
     const result = await this.edgeRepository.createEdge(dto);
 
     await this.redisService

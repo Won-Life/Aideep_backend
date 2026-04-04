@@ -10,6 +10,6 @@ import { WsModule } from 'src/ws/ws.module';
   imports: [WsModule],
   controllers: [NodeController],
   providers: [NodeService, NodeRepository, WorkspaceRepository, EdgeRepository],
-  exports: [NodeRepository]
+  exports: [NodeRepository, NodeService]
 })
 export class NodeModule {}
