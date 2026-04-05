@@ -17,8 +17,14 @@ import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
 import { WsEvent } from './ws.event';
 import { YjsDocManager } from '../yjs/yjs-doc-manager';
+import { YjsWsAwarenessService } from '../yjs/yjs-ws-awareness.service';
 import { WorkspaceRepository } from '../workspace/workspace.repository';
-import { YJS_EVENT, yjsRoom } from '../yjs/yjs.constants';
+import {
+  YJS_EVENT,
+  YJS_WS_EVENT,
+  yjsRoom,
+  yjsWsRoom
+} from '../yjs/yjs.constants';
 
 @WebSocketGateway({
   cors: { origin: '*' },
@@ -36,6 +42,7 @@ export class WsGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayD
   constructor(
     private readonly jwtService: JwtService,
     private readonly yjsDocManager: YjsDocManager,
+    private readonly yjsWsAwareness: YjsWsAwarenessService,
     private readonly workspaceRepository: WorkspaceRepository
   ) {}
 
@@ -90,13 +97,27 @@ export class WsGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayD
   // ── 기존 이벤트 (변경 없음) ───────────────────────────────────
 
   @SubscribeMessage('join_workspace')
-  handleJoin(
+  async handleJoin(
     @MessageBody() payload: { workspaceId: string },
     @ConnectedSocket() client: Socket
   ) {
     this.logger.debug('조인완료');
-    client.join(payload.workspaceId);
-    client.data.workspaceId = payload.workspaceId;
+    const { workspaceId } = payload;
+
+    client.join(workspaceId);
+    client.data.workspaceId = workspaceId;
+
+    // 워크스페이스 awareness 룸 참가
+    client.join(yjsWsRoom(workspaceId));
+
+    // Late joiner: 캐싱된 awareness 상태 전송
+    const cached = await this.yjsWsAwareness.getCachedAwareness(workspaceId);
+    if (cached) {
+      client.emit(YJS_WS_EVENT.AWARENESS, {
+        workspaceId,
+        data: Array.from(new Uint8Array(cached))
+      });
+    }
   }
 
   @SubscribeMessage('node_position_live')
@@ -253,6 +274,31 @@ export class WsGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayD
       rooms.delete(nodeId);
       if (rooms.size === 0) this.yjsRooms.delete(client.id);
     }
+  }
+
+  // ── 워크스페이스 레벨 Awareness ──────────────────────────────
+
+  @SubscribeMessage(YJS_WS_EVENT.AWARENESS)
+  async handleWsAwareness(
+    @MessageBody() payload: { workspaceId: string; data: Buffer },
+    @ConnectedSocket() client: Socket
+  ) {
+    const { workspaceId, data } = payload;
+
+    if (!workspaceId || !data) return;
+
+    // 멤버십 검증 (이미 join_workspace를 호출했으면 workspaceId가 세팅됨)
+    if (client.data.workspaceId !== workspaceId) return;
+
+    const buf = Buffer.isBuffer(data)
+      ? data
+      : Buffer.from(data as unknown as ArrayLike<number>);
+
+    // Redis 캐싱 (30s TTL) + 다른 클라이언트에 relay (병렬)
+    await this.yjsWsAwareness.cacheAwareness(workspaceId, buf);
+    client
+      .to(yjsWsRoom(workspaceId))
+      .emit(YJS_WS_EVENT.AWARENESS, payload);
   }
 
   // ── Broadcast (REST → WS) ────────────────────────────────────

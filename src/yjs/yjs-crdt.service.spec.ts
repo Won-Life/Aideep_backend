@@ -129,7 +129,7 @@ describe('YjsCrdtService', () => {
       // Verify the migrated state contains the markdown
       const doc = new Y.Doc();
       Y.applyUpdate(doc, new Uint8Array(result!.state!));
-      expect(doc.getText('content').toString()).toBe('# Title\nSome text');
+      expect(doc.get('root', Y.XmlText).toString()).toBe('# Title\nSome text');
       doc.destroy();
     });
 

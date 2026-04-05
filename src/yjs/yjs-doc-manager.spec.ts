@@ -126,18 +126,18 @@ describe('YjsDocManager', () => {
       clientDoc.destroy();
       Y.applyUpdate(doc, update);
 
-      const originalText = doc.getText('content').toString();
+      const originalText = doc.get('root', Y.XmlText).toString();
       manager.scheduleSave('node-1');
 
       // Text should remain unchanged (no double-apply)
-      expect(doc.getText('content').toString()).toBe(originalText);
+      expect(doc.get('root', Y.XmlText).toString()).toBe(originalText);
     });
   });
 
   describe('flushDoc', () => {
     it('saves state to both Redis and DB', async () => {
       const doc = await manager.getOrCreateDoc('node-1', 'ws-1');
-      doc.getText('content').insert(0, 'Flush me');
+      doc.get('root', Y.XmlText).insert(0, 'Flush me');
 
       await manager.flushDoc('node-1');
 
