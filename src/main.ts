@@ -5,19 +5,23 @@ import { ValidationPipe } from '@nestjs/common';
 import { AllExceptionsFilter } from './common/error';
 import { ResponseInterceptor } from './common/response/response.interceptor';
 import { LoggingInterceptor } from './common/logging/logging.interceptor';
+import { HttpMetricsInterceptor } from './common/metrics';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
 
+  const winstonLogger = app.get(WINSTON_MODULE_NEST_PROVIDER);
+
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
-  app.useGlobalFilters(new AllExceptionsFilter());
+  app.useGlobalFilters(new AllExceptionsFilter(winstonLogger));
   app.useGlobalInterceptors(
-    new LoggingInterceptor(app.get(WINSTON_MODULE_NEST_PROVIDER)),
+    new LoggingInterceptor(winstonLogger),
+    app.get(HttpMetricsInterceptor),
     new ResponseInterceptor()
   );
   app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
-  app.setGlobalPrefix('aideep/api');
+  app.setGlobalPrefix('aideep/api', { exclude: ['/metrics'] });
 
   const config = new DocumentBuilder()
     .setTitle('Aideep API 문서')

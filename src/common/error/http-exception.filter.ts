@@ -4,27 +4,31 @@ import {
   ExceptionFilter,
   HttpException,
   HttpStatus,
-  Logger,
+  Inject,
+  LoggerService
 } from '@nestjs/common';
 import { Response, Request } from 'express';
 import { BasicError } from './basic-error';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
-  private readonly logger = new Logger(AllExceptionsFilter.name);
+  constructor(
+    @Inject(WINSTON_MODULE_NEST_PROVIDER) private readonly logger: LoggerService
+  ) {}
 
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
+    const { method, url } = request;
 
     if (exception instanceof BasicError) {
-      if (exception.status >= 500) {
-        this.logger.error(
-          `[${request.method}] ${request.url}`,
-          exception.stack
-        );
-      }
+      this.logger.error(
+        `[Exception] ${method} ${url} ${exception.status} - ${exception.message}`,
+        exception.stack,
+        'ExceptionFilter'
+      );
       response.status(exception.status).json(exception.toJSON());
       return;
     }
@@ -46,22 +50,25 @@ export class AllExceptionsFilter implements ExceptionFilter {
         data = res.error || '';
       }
 
-      if (status >= 500) {
-        this.logger.error(`[${request.method}] ${request.url}`, exception.stack);
-      }
+      this.logger.error(
+        `[Exception] ${method} ${url} ${status} - ${reason}`,
+        status >= 500 ? exception.stack : undefined,
+        'ExceptionFilter'
+      );
 
       response.status(status).json({
         resultType: 'FAIL',
         error: { errorCode: `HTTP-${status}`, reason, data },
-        success: null,
+        success: null
       });
       return;
     }
 
     // 예상치 못한 에러 - 무조건 로깅
     this.logger.error(
-      `[${request.method}] ${request.url} - Unhandled exception`,
-      exception instanceof Error ? exception.stack : String(exception)
+      `[Exception] ${method} ${url} 500 - Unhandled exception`,
+      exception instanceof Error ? exception.stack : String(exception),
+      'ExceptionFilter'
     );
 
     response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
@@ -69,9 +76,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       error: {
         errorCode: 'COMMON-500',
         reason: '서버 내부 오류가 발생했습니다.',
-        data: '',
+        data: ''
       },
-      success: null,
+      success: null
     });
   }
 }

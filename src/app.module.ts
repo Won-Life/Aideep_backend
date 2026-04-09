@@ -11,24 +11,17 @@ import { RedisModule } from './redis/redis.module';
 import { WorkspaceModule } from './workspace/workspace.module';
 import { WsModule } from './ws/ws.module';
 import { NodeModule } from './node/node.module';
-import * as winston from 'winston';
-import { utilities, WinstonModule } from 'nest-winston';
+import { WinstonModule } from 'nest-winston';
 import { EdgeModule } from './edge/edge.module';
 import { UploadModule } from './upload/upload.module';
+import { MetricsModule } from './common/metrics';
+import { createWinstonConsoleTransport } from './common/logging/winston.console';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     WinstonModule.forRoot({
-      transports: [
-        new winston.transports.Console({
-          level: process.env.NODE_ENV === 'production' ? 'info' : 'silly',
-          format: winston.format.combine(
-            winston.format.timestamp(),
-            utilities.format.nestLike('AIdeep', { prettyPrint: true })
-          )
-        })
-      ]
+      transports: [createWinstonConsoleTransport()]
     }),
     PrismaModule,
     UserModule,
@@ -38,7 +31,8 @@ import { UploadModule } from './upload/upload.module';
     WorkspaceModule,
     NodeModule,
     EdgeModule,
-    UploadModule
+    UploadModule,
+    MetricsModule
   ],
   controllers: [AppController],
   providers: [AppService]

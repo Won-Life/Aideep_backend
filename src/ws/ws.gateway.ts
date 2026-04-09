@@ -19,6 +19,7 @@ import { WsEvent } from './ws.event';
 import { YjsDocManager } from '../yjs/yjs-doc-manager';
 import { YjsWsAwarenessService } from '../yjs/yjs-ws-awareness.service';
 import { WorkspaceRepository } from '../workspace/workspace.repository';
+import { WsMetricsService } from '../common/metrics';
 import {
   YJS_EVENT,
   YJS_WS_EVENT,
@@ -30,7 +31,9 @@ import {
   cors: { origin: '*' },
   namespace: '/workspace'
 })
-export class WsGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+export class WsGateway
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
   private readonly logger = new Logger(WsGateway.name);
 
   @WebSocketServer()
@@ -43,7 +46,8 @@ export class WsGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayD
     private readonly jwtService: JwtService,
     private readonly yjsDocManager: YjsDocManager,
     private readonly yjsWsAwareness: YjsWsAwarenessService,
-    private readonly workspaceRepository: WorkspaceRepository
+    private readonly workspaceRepository: WorkspaceRepository,
+    private readonly wsMetrics: WsMetricsService
   ) {}
 
   // ── 초기화 ────────────────────────────────────────────────────
@@ -51,7 +55,7 @@ export class WsGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayD
   afterInit(server: Namespace) {
     instrument(server.server, {
       auth: false,
-      mode: 'development',
+      mode: 'development'
     });
   }
 
@@ -71,12 +75,16 @@ export class WsGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayD
     try {
       const payload = this.jwtService.verify(token);
       client.data.userId = payload.user_id;
+      this.wsMetrics.increment();
     } catch {
       client.disconnect();
     }
   }
 
   handleDisconnect(client: Socket) {
+    if (client.data?.userId) {
+      this.wsMetrics.decrement();
+    }
     const workspaceId = client.data?.workspaceId;
     if (workspaceId) {
       client.to(workspaceId).emit('cursor_leave', {
@@ -296,9 +304,7 @@ export class WsGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayD
 
     // Redis 캐싱 (30s TTL) + 다른 클라이언트에 relay (병렬)
     await this.yjsWsAwareness.cacheAwareness(workspaceId, buf);
-    client
-      .to(yjsWsRoom(workspaceId))
-      .emit(YJS_WS_EVENT.AWARENESS, payload);
+    client.to(yjsWsRoom(workspaceId)).emit(YJS_WS_EVENT.AWARENESS, payload);
   }
 
   // ── Broadcast (REST → WS) ────────────────────────────────────
