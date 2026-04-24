@@ -43,8 +43,8 @@ export class AuthService {
 
   async issueMasterToken(userId: string) {
     const user = await this.userRepository.findByUserId(userId);
-    if (!user) {
-      throw new NotFoundException('존재하지 않는 유저입니다.');
+    if (!user || user.username!=="admin") {
+        throw new ForbiddenException("허용되지 않은 접근입니다.")
     }
 
     const payload = {

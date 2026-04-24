@@ -71,6 +71,7 @@ export class AuthController {
   }
 
   @Post('/issue/master')
+  @UseGuards(LocalAuthGuard)
   @ApiOperation({
     summary: '특정 유저에 대한 마스터 토큰을 발급합니다',
     description: '개발용'
