@@ -4,14 +4,12 @@ import {
   Post,
   Patch,
   Param,
-  Delete,
   UseGuards,
-  Query,
   Body,
-  Req,
   Request,
   Inject,
-  LoggerService
+  LoggerService,
+  Delete
 } from '@nestjs/common';
 import { NodeService } from './node.service';
 import {
@@ -23,11 +21,13 @@ import {
 import { JwtAuthGuard } from 'src/auth/guards/jwt.guards';
 import {
   CreateMarkDownNodeBody,
-  CreatePdfNodeBody,
   CreateProjectNodeBody
 } from './dto/createNode.dto';
+import { NodeMoveBody, UpdateNodeMetaBody } from './dto/updateNode.dto';
 import { Node } from './node.model';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
+import { ApiSuccessResponse } from 'src/common/response/api-success-response.decorator';
+import { NodeDetailDto } from './dto/nodeDetail.dto';
 
 @ApiTags('Node')
 @Controller('workspace/:workspaceId/node')
@@ -45,6 +45,7 @@ export class NodeController {
     summary: '프로젝트 노드 생성 생성',
     description: '워크스페이스에 새 노드를 생성합니다.'
   })
+  @ApiSuccessResponse({ type: 'string', example: '생성성공' }, 201)
   async createProjectNode(
     @Param('workspaceId') workspaceId: string,
     @Body() body: CreateProjectNodeBody,
@@ -52,8 +53,8 @@ export class NodeController {
   ) {
     const userId = req.user?.user_id;
     const node = Node.fromProjectDto(body, workspaceId, userId);
-    await this.nodeService.createProjectNode(node);
-    return '생성 성공';
+    const nodeId = await this.nodeService.createProjectNode(node);
+    return { nodeId };
   }
 
   @Post('/md')
@@ -61,6 +62,11 @@ export class NodeController {
     summary: 'MD 노드 생성 생성',
     description: '워크스페이스에 새 노드를 생성합니다.'
   })
+  @ApiSuccessResponse(
+    { type: 'string', example: '생성 성공' },
+    201,
+    'MD 노드 생성 성공'
+  )
   async createMarkdownNode(
     @Request() req: any,
     @Param('workspaceId') workspaceId: string,
@@ -68,38 +74,10 @@ export class NodeController {
   ) {
     const userId = req.user?.user_id;
     const node = Node.fromMarkDownDto(body, workspaceId, userId);
-    await this.nodeService.createMarkdownNode(node);
-    return '생성 성공';
+    console.log(node);
+    const nodeId = await this.nodeService.createMarkdownNode(node);
+    return { nodeId };
   }
-
-  @Post('pdf')
-  @ApiOperation({
-    summary: 'PDF 노드 생성',
-    description: '워크스페이스에 새 노드를 생성합니다.'
-  })
-  async createPdfNode(
-    @Param('workspaceId') workspaceId: string,
-    @Body() body: CreatePdfNodeBody,
-    @Request() req: any
-  ) {
-    const userId = req.user?.user_id;
-    const node = Node.fromPdfDto(body, workspaceId, userId);
-    await this.nodeService.createPdfNode(node);
-    return '생성 성공';
-  }
-
-  // @Get()
-  // @ApiOperation({
-  //   summary: '노드 전체 조회',
-  //   description: '워크스페이스의 모든 노드를 조회합니다.'
-  // })
-  // async queryAllNode(
-  //   @Param('workspaceId') workspaceId: string,
-  //   @Request() req: any
-  // ) {
-  //   const userId = req.user?.user_id;
-  //   // return await this.nodeService.queryAllNode(workspaceId, userId);
-  // }
 
   @Get(':nodeId')
   @ApiOperation({
@@ -107,6 +85,7 @@ export class NodeController {
     description: '특정 노드의 상세 정보를 조회합니다.'
   })
   @ApiParam({ name: 'nodeId', description: '노드 ID' })
+  @ApiSuccessResponse(NodeDetailDto, 200, '노드 상세 조회 성공')
   async queryDetailNode(
     @Param('workspaceId') workspaceId: string,
     @Param('nodeId') nodeId: string,
@@ -116,29 +95,87 @@ export class NodeController {
     return await this.nodeService.queryDetailNode(workspaceId, nodeId, userId);
   }
 
-  @Patch(':nodeId')
+  @Patch('/:nodeId')
   @ApiOperation({
-    summary: '노드 수정',
-    description: '특정 노드의 정보를 수정합니다.'
+    summary: '노드 메타 수정',
+    description:
+      '노드의 제목, 색깔(color/textColor)을 수정합니다. MD 내용은 YJS로 편집하세요.'
   })
-  @ApiParam({ name: 'nodeId', description: '노드 ID' })
-  editNode(
-    @Param('workspaceId') workspaceId: string,
-    @Param('nodeId') nodeId: string
-  ) {}
+  @ApiParam({ name: 'nodeId', description: '노드 아이디' })
+  @ApiSuccessResponse(
+    { type: 'string', example: '수정 성공' },
+    200,
+    '노드 메타 수정 성공'
+  )
+  async updateNodeMeta(
+    @Request() req: any,
+    @Body() body: UpdateNodeMetaBody,
+    @Param('nodeId') nodeId: string,
+    @Param('workspaceId') workspaceId: string
+  ) {
+    const userId = req.user?.user_id;
+    await this.nodeService.updateNodeMeta(userId, nodeId, workspaceId, body);
+    return '수정 성공';
+  }
 
-  // @Delete(':nodeId')
+  @Patch('/:nodeId/move')
+  @ApiOperation({
+    summary: '노드 이동',
+    description: 'Node의 position x,y 정보만 업데이트 합니다.'
+  })
+  @ApiParam({
+    name: 'nodeId',
+    description: '노드 아이디'
+  })
+  @ApiSuccessResponse(
+    { type: 'string', example: '이동 성공' },
+    200,
+    '노드 이동 성공'
+  )
+  async moveNode(
+    @Request() req: any,
+    @Body() body: NodeMoveBody,
+    @Param('nodeId') nodeId: string,
+    @Param('workspaceId') workspaceId: string
+  ) {
+    const userId = req.user?.user_id;
+    await this.nodeService.updateNodePosition(
+      body,
+      userId,
+      workspaceId,
+      nodeId
+    );
+    return '이동 성공';
+  }
+
+  // @Post('/pdf')
   // @ApiOperation({
-  //   summary: '노드 삭제',
-  //   description: '특정 노드를 삭제합니다.'
+  //   summary: 'PDF 노드 생성',
+  //   description: '워크스페이스에 새 노드를 생성합니다.'
   // })
-  // @ApiParam({ name: 'nodeId', description: '노드 ID' })
-  // deleteNode(
-  //   @Request() req: any,
+  // async createPdfNode(
   //   @Param('workspaceId') workspaceId: string,
-  //   @Param('nodeId') nodeId: string
+  //   @Body() body: CreatePdfNodeBody,
+  //   @Request() req: any
   // ) {
   //   const userId = req.user?.user_id;
-  //   await this.nodeService
+  //   const node = Node.fromPdfDto(body, workspaceId, userId);
+  //   await this.nodeService.createPdfNode(node);
+  //   return '생성 성공';
   // }
+
+  @Delete(':nodeId')
+  @ApiOperation({
+    summary: '노드 삭제',
+    description: '특정 노드를 삭제합니다.'
+  })
+  @ApiParam({ name: 'nodeId', description: '노드 ID' })
+    async deleteNode(
+    @Request() req: any,
+    @Param('workspaceId') workspaceId: string,
+    @Param('nodeId') nodeId: string
+  ): Promise<string> {
+    const userId = req.user?.user_id;
+    return await this.nodeService.deleteNode(workspaceId, userId, nodeId);
+  }
 }

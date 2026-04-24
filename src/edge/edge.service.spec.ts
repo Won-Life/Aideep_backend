@@ -9,6 +9,8 @@ import { EdgeRepository } from './edge.repository';
 import { WorkspaceRepository } from 'src/workspace/workspace.repository';
 import { NodeRepository } from 'src/node/node.repository';
 import { Edge } from './edge.model';
+import { WsGateway } from 'src/ws/ws.gateway';
+import { RedisService } from 'src/redis/redis.service';
 
 // @Transactional() 데코레이터가 runInTransaction을 호출하므로 mock 처리
 jest.mock('src/prisma/transaction.storage', () => ({
@@ -20,6 +22,8 @@ describe('EdgeService', () => {
   let edgeRepo: jest.Mocked<EdgeRepository>;
   let workspaceRepo: jest.Mocked<WorkspaceRepository>;
   let nodeRepo: jest.Mocked<NodeRepository>;
+  let wsGateway: { broadcast: jest.Mock };
+  let mockRedisClient: { del: jest.Mock };
 
   const makeEdge = (overrides: Partial<Edge> = {}): Edge =>
     ({
@@ -57,6 +61,20 @@ describe('EdgeService', () => {
           useValue: {
             selectNodeById: jest.fn()
           }
+        },
+        {
+          provide: WsGateway,
+          useValue: {
+            broadcast: jest.fn()
+          }
+        },
+        {
+          provide: RedisService,
+          useValue: {
+            getClient: jest.fn().mockReturnValue({
+              del: jest.fn().mockResolvedValue(1)
+            })
+          }
         }
       ]
     }).compile();
@@ -65,6 +83,8 @@ describe('EdgeService', () => {
     edgeRepo = module.get(EdgeRepository);
     workspaceRepo = module.get(WorkspaceRepository);
     nodeRepo = module.get(NodeRepository);
+    wsGateway = module.get(WsGateway);
+    mockRedisClient = module.get(RedisService).getClient() as any;
   });
 
   // 정상 케이스 기본 세팅 헬퍼
@@ -74,7 +94,7 @@ describe('EdgeService', () => {
     edgeRepo.findEdge.mockResolvedValue(null);
     edgeRepo.findEdgesBySource.mockResolvedValue([]);
     edgeRepo.findAllEdgesInWorkspace.mockResolvedValue([]);
-    edgeRepo.createEdge.mockResolvedValue(undefined);
+    edgeRepo.createEdge.mockResolvedValue({ edge_id: 'edge-1' } as any);
   };
 
   describe('connectNodes', () => {
@@ -195,6 +215,38 @@ describe('EdgeService', () => {
       expect(edgeRepo.createEdge).toHaveBeenCalledWith(dto);
     });
 
+    it('정상 연결 시 EDGE_CREATE 이벤트를 broadcast한다', async () => {
+      const dto = makeEdge();
+      setupHappyPath();
+
+      await service.connectNodes(dto);
+
+      expect(wsGateway.broadcast).toHaveBeenCalledTimes(1);
+      expect(wsGateway.broadcast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'EDGE_CREATE',
+          workspaceId: dto.workspaceId,
+          userId: dto.userId,
+          edge: expect.objectContaining({
+            edgeId: 'edge-1',
+            sourceId: dto.sourceId,
+            targetId: dto.targetId,
+            sourceHandle: dto.sourceHandle,
+            targetHandle: dto.targetHandle,
+          }),
+        }),
+      );
+    });
+
+    it('정상 연결 시 Redis 워크스페이스 캐시를 무효화한다', async () => {
+      const dto = makeEdge();
+      setupHappyPath();
+
+      await service.connectNodes(dto);
+
+      expect(mockRedisClient.del).toHaveBeenCalledTimes(1);
+    });
+
     it('정상 연결 시 checkWorkspace, selectNodeById, findEdge, findEdgesBySource, findAllEdgesInWorkspace를 올바른 인자로 호출한다', async () => {
       const dto = makeEdge();
       setupHappyPath();
@@ -234,7 +286,7 @@ describe('EdgeService', () => {
       nodeRepo.selectNodeById.mockResolvedValue({ id: 'node' } as any);
       edgeRepo.findEdge.mockResolvedValue(null);
       edgeRepo.findEdgesBySource.mockResolvedValue([]);
-      edgeRepo.createEdge.mockResolvedValue(undefined);
+      edgeRepo.createEdge.mockResolvedValue({ edge_id: 'edge-1' } as any);
     };
 
     it('사이클이 없으면 createEdge를 호출한다', async () => {

@@ -1,14 +1,27 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { createWorkspaceBody } from './dto/createWorkspace.dto';
+import { CreateWorkspaceBody } from './dto/createWorkspace.dto';
 import { workspace_role_enum } from '@prisma/client';
 
 @Injectable()
 export class WorkspaceRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async insertWorkspace(body: createWorkspaceBody) {
-    return await this.prisma.workspaces.create({
+  async selectUserWorkspace(userId: string) {
+    return await this.prisma.client.users_workspaces.findMany({
+      where: {
+        user_id: userId
+      },
+      include: {
+        workspaces: {
+          select: { title: true }
+        }
+      }
+    });
+  }
+
+  async insertWorkspace(body: CreateWorkspaceBody) {
+    return await this.prisma.client.workspaces.create({
       data: {
         title: body.title
       }
@@ -20,7 +33,7 @@ export class WorkspaceRepository {
     workspaceId: string,
     role: workspace_role_enum
   ) {
-    await this.prisma.users_workspaces.create({
+    await this.prisma.client.users_workspaces.create({
       data: {
         user_id: userId,
         workspace_id: workspaceId,
@@ -30,7 +43,7 @@ export class WorkspaceRepository {
   }
 
   async checkWorkspace(userId: string, workspaceId: string) {
-    return await this.prisma.users_workspaces.findFirst({
+    return await this.prisma.client.users_workspaces.findFirst({
       where: {
         user_id: userId,
         workspace_id: workspaceId

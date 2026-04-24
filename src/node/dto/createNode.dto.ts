@@ -2,7 +2,28 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsNumber, IsString, IsUrl, ValidateNested } from 'class-validator';
 
-class PositionDto {
+export class MarkDownBody {
+  @IsString()
+  jsonBody: string;
+
+  @IsString()
+  markdownBody: string;
+
+  @IsString()
+  color: string;
+
+  @IsString()
+  textColor: string;
+}
+export class ProjectBody {
+  @IsString()
+  color: string;
+
+  @IsString()
+  textColor: string;
+}
+
+export class PositionDto {
   @ApiProperty({ example: 100 })
   @IsNumber()
   x: number;
@@ -21,6 +42,11 @@ export class CreateProjectNodeBody {
   @ValidateNested()
   @Type(() => PositionDto)
   position: PositionDto;
+
+  @ApiProperty({ type: ProjectBody })
+  @ValidateNested()
+  @Type(() => ProjectBody)
+  body: ProjectBody;
 }
 
 export class CreateMarkDownNodeBody {
@@ -33,9 +59,10 @@ export class CreateMarkDownNodeBody {
   @Type(() => PositionDto)
   position: PositionDto;
 
-  @ApiProperty({ example: '## 제목\n내용을 입력하세요.' })
-  @IsString()
-  body: string;
+  @ApiProperty({ type: MarkDownBody })
+  @ValidateNested()
+  @Type(() => MarkDownBody)
+  body: MarkDownBody;
 }
 
 class PdfDataDto {

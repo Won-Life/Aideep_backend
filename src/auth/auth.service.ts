@@ -11,12 +11,9 @@ import { JwtService } from '@nestjs/jwt';
 import { JwtPayload } from './strategy/jwt.strategy';
 import { SendMailRequestBody } from './dtos/sendSMS.dto';
 import { transporter } from './mailer.service';
-import dotenv from 'dotenv';
 import { RedisService } from 'src/redis/redis.service';
 import { REDIS_KEYS } from 'src/redis/redis.keys';
 import { VerifyEmailRequestBody } from './dtos/verifyEmail.dto';
-
-dotenv.config();
 
 @Injectable()
 export class AuthService {
