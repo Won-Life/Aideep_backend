@@ -41,7 +41,7 @@ export class AuthService {
     return null;
   }
 
-  async issueMasterToken(userId: string) {
+  async issueMasterToken(userId : string) {
     const user = await this.userRepository.findByUserId(userId);
     if (!user || user.username!=="admin") {
         throw new ForbiddenException("허용되지 않은 접근입니다.")
