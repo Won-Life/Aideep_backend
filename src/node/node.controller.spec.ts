@@ -8,7 +8,7 @@ import {
 import request from 'supertest';
 import { NodeController } from './node.controller';
 import { NodeService } from './node.service';
-import { JwtAuthGuard } from 'src/auth/guards/jwt.guards';
+import { JwtAuthGuard } from 'src/auth/guards/jwt.guard';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 
 const mockUserId = 'user-uuid-1234';

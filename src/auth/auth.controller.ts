@@ -17,11 +17,11 @@ import {
   ApiProperty
 } from '@nestjs/swagger';
 import { ApiSuccessResponse } from 'src/common/response/api-success-response.decorator';
-import { JwtAuthGuard } from './guards/jwt.guards';
+import { JwtAuthGuard } from './guards/jwt.guard';
 import { SendMailRequestBody, SendSmsResponseDto } from './dtos/sendSMS.dto';
 import { VerifyEmailRequestBody } from './dtos/verifyEmail.dto';
 import { IsString } from 'class-validator';
-import { LocalAuthGuard } from './guards/local.guards';
+import { LocalAuthGuard } from './guards/local.guard';
 
 class RefreshTokenBody {
   @ApiProperty({ example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' })

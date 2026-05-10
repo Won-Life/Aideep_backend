@@ -1,7 +1,7 @@
 import { Controller, Get, UseGuards, Request } from '@nestjs/common';
 import { UserService } from './user.service';
 import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { JwtAuthGuard } from 'src/auth/guards/jwt.guards';
+import { JwtAuthGuard } from 'src/auth/guards/jwt.guard';
 import { ApiSuccessResponse } from 'src/common/response/api-success-response.decorator';
 import { UserInfoDto } from './dto/user.dto';
 

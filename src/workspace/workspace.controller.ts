@@ -8,7 +8,7 @@ import {
   Request,
   UseGuards
 } from '@nestjs/common';
-import { JwtAuthGuard } from 'src/auth/guards/jwt.guards';
+import { JwtAuthGuard } from 'src/auth/guards/jwt.guard';
 import { ApiBearerAuth, ApiBody, ApiOperation } from '@nestjs/swagger';
 import {
   CreateWorkspaceBody,
@@ -26,9 +26,7 @@ import { UserWokrpaceInfoDto, WorkspaceInfoDto } from './dto/workspaceInfo.dto';
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth('jwt')
 export class WorkspaceController {
-  constructor(
-    private readonly workspaceService: WorkspaceService
-  ) {}
+  constructor(private readonly workspaceService: WorkspaceService) {}
 
   @Get('/')
   @ApiOperation({

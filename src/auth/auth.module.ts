@@ -4,7 +4,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { UserModule } from 'src/user/user.module';
 import { LocalStrategy } from './strategy/local.strategy';
-import { JwtAuthGuard } from './guards/jwt.guards';
+import { JwtAuthGuard } from './guards/jwt.guard';
 import { JwtModule } from '@nestjs/jwt';
 import { JwtStrategy } from './strategy/jwt.strategy';
 
@@ -16,12 +16,12 @@ import { JwtStrategy } from './strategy/jwt.strategy';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '15m' },
-      }),
-    }),
+        signOptions: { expiresIn: '15m' }
+      })
+    })
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtAuthGuard, LocalStrategy, JwtStrategy],
-  exports: [JwtAuthGuard, JwtModule],
+  exports: [JwtAuthGuard, JwtModule]
 })
 export class AuthModule {}
