@@ -74,12 +74,11 @@ export class AuthController {
   @UseGuards(LocalAuthGuard)
   @ApiOperation({
     summary: '특정 유저에 대한 마스터 토큰을 발급합니다',
-    description: '개발용',
-    deprecated : true
+    description: '개발용'
   })
-  async issueMaster(@Request() req: Express.Request) {
-    // const userId = req?.user.user_id;
-    // return await this.authService.issueMasterToken(userId);
+  async issueMaster(@Body() body: LoginBody, @Request() req: any) {
+    const userId = req?.user.user_id;
+    return await this.authService.issueMasterToken(userId);
   }
 
   @Post('/email/send')
