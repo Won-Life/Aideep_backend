@@ -23,7 +23,10 @@ if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
   exit 1
 fi
 
-mapfile -t OLD_TAGS < <(
+OLD_TAGS=()
+while IFS= read -r tag; do
+  [ -n "$tag" ] && OLD_TAGS+=("$tag")
+done < <(
   curl -s -H "Authorization: JWT $TOKEN" \
     "https://hub.docker.com/v2/repositories/${NS}/${REPO}/tags/?page_size=100" \
     | jq -r --arg pfx "${BRANCH}-" --argjson keep "$KEEP" '
