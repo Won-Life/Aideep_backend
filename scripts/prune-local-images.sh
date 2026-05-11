@@ -7,7 +7,10 @@ KEEP="${3:-3}"
 
 PREFIX="${REPO}:${BRANCH}-"
 
-mapfile -t OLD_TAGS < <(
+OLD_TAGS=()
+while IFS= read -r tag; do
+  [ -n "$tag" ] && OLD_TAGS+=("$tag")
+done < <(
   docker images --format '{{.Repository}}:{{.Tag}}|{{.CreatedAt}}' \
     | awk -F'|' -v p="$PREFIX" 'index($1, p) == 1 {print $0}' \
     | sort -t'|' -k2 -r \
