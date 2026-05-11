@@ -1,8 +1,6 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: seoki/aideep:${IMAGE_TAG:-develop}
     container_name: aideep-app
 
     network_mode: host

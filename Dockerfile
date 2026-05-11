@@ -29,4 +29,7 @@ COPY prisma ./prisma
 
 EXPOSE 3320
 
-CMD ["node", "dist/src/main"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD wget -qO- http://localhost:3320/v1/aideep/api/docs > /dev/null || exit 1
+
+CMD ["sh", "-c", "pnpm prisma migrate deploy && node dist/src/main"]
