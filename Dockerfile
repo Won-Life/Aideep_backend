@@ -30,6 +30,6 @@ RUN pnpm prisma generate --schema=./prisma/schema.prisma
 EXPOSE 3320
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD wget -qO- http://localhost:3320/v1/aideep/api/docs > /dev/null || exit 1
+  CMD wget -qO- http://localhost:3320/aideep/api > /dev/null || exit 1
 
 CMD ["sh", "-c", "pnpm prisma db push && node dist/src/main"]
