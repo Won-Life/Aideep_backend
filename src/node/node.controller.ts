@@ -18,7 +18,7 @@ import {
   ApiParam,
   ApiTags
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from 'src/auth/guards/jwt.guards';
+import { JwtAuthGuard } from 'src/auth/guards/jwt.guard';
 import {
   CreateMarkDownNodeBody,
   CreateProjectNodeBody
@@ -170,7 +170,7 @@ export class NodeController {
     description: '특정 노드를 삭제합니다.'
   })
   @ApiParam({ name: 'nodeId', description: '노드 ID' })
-    async deleteNode(
+  async deleteNode(
     @Request() req: any,
     @Param('workspaceId') workspaceId: string,
     @Param('nodeId') nodeId: string

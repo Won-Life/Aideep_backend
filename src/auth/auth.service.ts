@@ -1,6 +1,9 @@
 import {
   ForbiddenException,
+  Inject,
   Injectable,
+  Logger,
+  LoggerService,
   NotFoundException,
   UnauthorizedException
 } from '@nestjs/common';
@@ -8,19 +11,21 @@ import { UserRepository } from 'src/user/user.repository';
 import { SignUpBody } from './dtos/signUpBody.dto';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
-import { JwtPayload } from './strategy/jwt.strategy';
+import { JwtPayload, MasterJwtPayload } from './strategy/jwt.strategy';
 import { SendMailRequestBody } from './dtos/sendSMS.dto';
 import { transporter } from './mailer.service';
 import { RedisService } from 'src/redis/redis.service';
 import { REDIS_KEYS } from 'src/redis/redis.keys';
 import { VerifyEmailRequestBody } from './dtos/verifyEmail.dto';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston/dist/winston.constants';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly userRepository: UserRepository,
     private readonly jwtService: JwtService,
-    private readonly redisService: RedisService
+    private readonly redisService: RedisService,
+    @Inject(WINSTON_MODULE_NEST_PROVIDER) private readonly logger: LoggerService
   ) {}
 
   async validateUser(email: string, password: string) {
@@ -42,12 +47,23 @@ export class AuthService {
   }
 
   async issueMasterToken(userId: string) {
+    if (process.env.NODE_ENV === 'production')
+      throw new ForbiddenException('배포환경에서 사용 할 수 없습니다');
+
     const user = await this.userRepository.findByUserId(userId);
     if (!user) {
-      throw new NotFoundException('존재하지 않는 유저입니다.');
+      throw new ForbiddenException('허용되지 않은 접근입니다.');
     }
 
-    const payload = {
+    const allowed = (process.env.MASTER_USER_IDS ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (!allowed.includes(user.user_id)) {
+      throw new ForbiddenException('허용되지 않은 접근입니다.');
+    }
+
+    const payload: MasterJwtPayload = {
       userName: user.username,
       email: user.email,
       user_id: user.user_id,
@@ -57,7 +73,13 @@ export class AuthService {
     const masterToken = this.jwtService.sign(payload, { expiresIn: '30d' });
     await this.redisService
       .getClient()
-      .set(REDIS_KEYS.REFRESH_TOKEN(userId), masterToken);
+      .set(REDIS_KEYS.MASTER_TOKEN(user.user_id), masterToken, {
+        EX: 60 * 60 * 24 * 30
+      });
+
+    this.logger.warn(
+      `[MASTER_TOKEN_ISSUED] user=${user.user_id} email=${user.email}`
+    );
 
     return { masterToken };
   }

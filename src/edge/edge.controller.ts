@@ -15,7 +15,7 @@ import {
   ApiParam,
   ApiTags
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from 'src/auth/guards/jwt.guards';
+import { JwtAuthGuard } from 'src/auth/guards/jwt.guard';
 import { Edge } from './edge.model';
 import { ApiSuccessResponse } from 'src/common/response/api-success-response.decorator';
 

@@ -6,11 +6,15 @@ import { RedisService } from 'src/redis/redis.service';
 import { REDIS_KEYS } from 'src/redis/redis.keys';
 import { Request } from 'express';
 
-export type JwtPayload = {
+type BaseJwtPayload = {
   userName: string;
   email: string;
   user_id: string;
 };
+
+export type UserJwtPayload = BaseJwtPayload & { isMaster?: false };
+export type MasterJwtPayload = BaseJwtPayload & { isMaster: true };
+export type JwtPayload = UserJwtPayload | MasterJwtPayload;
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -22,8 +26,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jwtFromRequest: ExtractJwt.fromExtractors([
         ExtractJwt.fromAuthHeaderAsBearerToken(),
         (req: Request) => {
-          // SSE connections use EventSource which cannot set custom headers,
-          // so the token is passed as a query parameter instead.
           return (req.query?.token as string) ?? null;
         }
       ]),
@@ -44,6 +46,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (blacklisted) {
       throw new UnauthorizedException('만료된 토큰입니다.');
     }
+
+    if (payload.isMaster === true) {
+      const stored = await this.redisService
+        .getClient()
+        .get(REDIS_KEYS.MASTER_TOKEN(payload.user_id));
+      if (!stored || stored !== token) {
+        throw new UnauthorizedException('만료/폐기된 마스터 토큰입니다.');
+      }
+    }
+
     return payload;
   }
 }

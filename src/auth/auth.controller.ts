@@ -17,11 +17,11 @@ import {
   ApiProperty
 } from '@nestjs/swagger';
 import { ApiSuccessResponse } from 'src/common/response/api-success-response.decorator';
-import { JwtAuthGuard } from './guards/jwt.guards';
+import { JwtAuthGuard } from './guards/jwt.guard';
 import { SendMailRequestBody, SendSmsResponseDto } from './dtos/sendSMS.dto';
 import { VerifyEmailRequestBody } from './dtos/verifyEmail.dto';
 import { IsString } from 'class-validator';
-import { LocalAuthGuard } from './guards/local.guards';
+import { LocalAuthGuard } from './guards/local.guard';
 
 class RefreshTokenBody {
   @ApiProperty({ example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' })
@@ -71,12 +71,14 @@ export class AuthController {
   }
 
   @Post('/issue/master')
+  @UseGuards(LocalAuthGuard)
   @ApiOperation({
     summary: '특정 유저에 대한 마스터 토큰을 발급합니다',
     description: '개발용'
   })
-  async issueMaster(@Body() body: IssueMasterBody) {
-    return await this.authService.issueMasterToken(body.userId);
+  async issueMaster(@Body() body: LoginBody, @Request() req: any) {
+    const userId = req?.user.user_id;
+    return await this.authService.issueMasterToken(userId);
   }
 
   @Post('/email/send')
