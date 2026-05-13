@@ -81,7 +81,7 @@ export class WorkspaceService {
         await this.workspaceRepository.countActiveMembers(workspaceId);
       if (activeMembers > 1) {
         throw new BadRequestException(
-          '다른 멤버가 남아 있어 OWNER는 떠날 수 없습니다. 소유권을 이전한 후 다시 시도해주세요.'
+          '다른 멤버가 남아 있어 OWNER는 떠날 수 없습니다. 소유권을 이전 하거나, 삭제해주세요.'
         );
       }
       await this.workspaceRepository.softDeleteWorkspace(workspaceId);
