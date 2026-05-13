@@ -22,6 +22,31 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     setTransactionRunner(this.runInTransaction.bind(this));
+    this.prisma.$extends({
+      query: {
+        async $allOperations({
+          operation,
+          model,
+          args,
+          query
+        }: {
+          model?: string;
+          operation: string;
+          args: unknown;
+          query: (a: unknown) => Promise<unknown>;
+        }) {
+          const start = performance.now();
+          const result = await query(args);
+          const ms = performance.now() - start;
+          const label = `${model ?? '?'}.${operation}`;
+          console.log(`[${label}] ${ms.toFixed(2)}ms`);
+          if (ms > 500) {
+            console.warn(`Slow query: ${label} - ${ms.toFixed(2)}ms`);
+          }
+          return result;
+        }
+      }
+    });
     await this.prisma.$connect();
   }
 
