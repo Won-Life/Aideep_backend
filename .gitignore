@@ -60,6 +60,9 @@ tunnel.sh
 prisma/*
 !prisma/schema.prisma
 
+# Prisma v7 generated client
+/src/generated
+
 /.vscode
 
 

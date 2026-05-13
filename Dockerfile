@@ -25,7 +25,7 @@ RUN pnpm install --frozen-lockfile --prod
 
 COPY --from=builder /app/dist ./dist
 COPY prisma ./prisma
-RUN pnpm prisma generate --schema=./prisma/schema.prisma
+COPY prisma.config.ts ./
 
 EXPOSE 3320
 
