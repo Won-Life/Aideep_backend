@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { workspace_role_enum } from '@prisma/client';
+import { workspace_role_enum } from '../../generated/prisma/client';
 import { IsEnum, IsString, IsUrl } from 'class-validator';
 
 export class JoinWorkspaceBody {

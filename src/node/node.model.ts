@@ -6,7 +6,7 @@ import {
 } from './dto/createNode.dto';
 import { IsEnum, IsNumber, IsString, IsUUID } from 'class-validator';
 import { json } from 'stream/consumers';
-import { node_type_enum } from '@prisma/client';
+import { node_type_enum } from '../generated/prisma/client';
 
 const MAX_TITLE_LENGTH = 500;
 

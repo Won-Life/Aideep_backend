@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../../generated/prisma/client';
 import { BasicError } from './basic-error';
 
 export class DatabaseUniqueConstraintError extends BasicError {

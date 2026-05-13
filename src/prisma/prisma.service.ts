@@ -1,5 +1,6 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Prisma, PrismaClient } from '../generated/prisma/client';
 import {
   transactionStorage,
   setTransactionRunner
@@ -7,7 +8,9 @@ import {
 
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
-  private readonly prisma = new PrismaClient();
+  private readonly prisma = new PrismaClient({
+    adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! })
+  });
 
   get client(): Prisma.TransactionClient {
     return transactionStorage.getStore() ?? this.prisma;
