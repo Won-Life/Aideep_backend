@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -21,14 +22,13 @@ import {
 } from './dto/joinWorkspace.dto';
 import { ApiSuccessResponse } from 'src/common/response/api-success-response.decorator';
 import { UserWokrpaceInfoDto, WorkspaceInfoDto } from './dto/workspaceInfo.dto';
+import { LeaveWorkspaceBody } from './dto/leaveWorkspace';
 
 @Controller('workspace')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth('jwt')
 export class WorkspaceController {
-  constructor(
-    private readonly workspaceService: WorkspaceService
-  ) {}
+  constructor(private readonly workspaceService: WorkspaceService) {}
 
   @Get('/')
   @ApiOperation({
@@ -65,6 +65,22 @@ export class WorkspaceController {
   async inviteWorkspace(@Request() req: any, @Body() body: JoinWorkspaceBody) {
     const userId = req.user?.user_id;
     return await this.workspaceService.inviteWorkspace(body, userId);
+  }
+
+  @Delete('/leave')
+  @ApiOperation({
+    summary: '특정 워크스페이스를 떠납니다.'
+  })
+  @ApiSuccessResponse(
+    {
+      type: 'object',
+      properties: { workspaceId: { type: 'string' } }
+    },
+    200
+  )
+  async leaveWorkspace(@Request() req: any, @Body() body: LeaveWorkspaceBody) {
+    const userId = req.user?.user_id;
+    return await this.workspaceService.leaveWorkspace(body, userId);
   }
 
   @Post('/join/:workspaceId')
