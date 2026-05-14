@@ -20,7 +20,7 @@ import {
   JoinWorkspaceBody as InviteWorkspaceBody,
   InviteWOrkspaceResponseDto
 } from './dto/joinWorkspace.dto';
-import { LeaveWorkspaceBody } from './dto/leaveWorkspace';
+import { LeaveWorkspaceBody } from './dto/leaveWorkspace.dto';
 import { workspace_role_enum } from '../generated/prisma/client';
 
 const WORKSPACE_SYNC_TTL = 60 * 10;

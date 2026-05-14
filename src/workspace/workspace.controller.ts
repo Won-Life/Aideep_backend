@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/guards/jwt.guard';
 import { ApiBearerAuth, ApiBody, ApiOperation } from '@nestjs/swagger';
+import { ApiErrorResponse } from 'src/common/response/api-error-response.decorator';
 import {
   CreateWorkspaceBody,
   CreateWorkspaceResponseDto
@@ -22,7 +23,10 @@ import {
 } from './dto/joinWorkspace.dto';
 import { ApiSuccessResponse } from 'src/common/response/api-success-response.decorator';
 import { UserWokrpaceInfoDto, WorkspaceInfoDto } from './dto/workspaceInfo.dto';
-import { LeaveWorkspaceBody } from './dto/leaveWorkspace';
+import {
+  LeaveWorkspaceBody,
+  LeaveWorkspaceResponseDto
+} from './dto/leaveWorkspace.dto';
 
 @Controller('workspace')
 @UseGuards(JwtAuthGuard)
@@ -69,14 +73,16 @@ export class WorkspaceController {
 
   @Delete('/leave')
   @ApiOperation({
-    summary: '특정 워크스페이스를 떠납니다.'
+    summary: '특정 워크스페이스를 떠납니다.',
+    description:
+      '현재 유저를 해당 워크스페이스에서 제거합니다. OWNER인 경우 다른 멤버가 남아 있으면 떠날 수 없으며, 마지막 OWNER가 떠나면 워크스페이스는 soft delete 됩니다.'
   })
-  @ApiSuccessResponse(
-    {
-      type: 'object',
-      properties: { workspaceId: { type: 'string' } }
-    },
-    200
+  @ApiBody({ type: LeaveWorkspaceBody })
+  @ApiSuccessResponse(LeaveWorkspaceResponseDto, 200)
+  @ApiErrorResponse(404, '해당 유저의 워크스페이스가 존재하지 않습니다.')
+  @ApiErrorResponse(
+    400,
+    '다른 멤버가 남아 있어 OWNER는 떠날 수 없습니다. 소유권을 이전 하거나, 삭제해주세요.'
   )
   async leaveWorkspace(@Request() req: any, @Body() body: LeaveWorkspaceBody) {
     const userId = req.user?.user_id;
