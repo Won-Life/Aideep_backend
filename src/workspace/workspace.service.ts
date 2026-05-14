@@ -112,11 +112,7 @@ export class WorkspaceService {
     return result;
   }
 
-  private async checkExist(
-    userId: string,
-    workspaceId: string,
-    role?: workspace_role_enum
-  ) {
+  private async checkExist(userId: string, workspaceId: string) {
     const check = await this.workspaceRepository.checkWorkspace(
       userId,
       workspaceId
@@ -125,8 +121,8 @@ export class WorkspaceService {
       throw new NotFoundException(
         '해당 유저의 워크스페이스가 존재하지 않습니다.'
       );
-    if (check.role !== role)
-      throw new BadRequestException('워크스페이스 권한이 일치하지 않습니다.');
+    // if (check.role !== role)
+    //   throw new BadRequestException('워크스페이스 권한이 일치하지 않습니다.');
   }
 
   async inviteWorkspace(
