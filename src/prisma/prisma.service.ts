@@ -9,7 +9,10 @@ import {
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
   private readonly prisma = new PrismaClient({
-    adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! })
+    adapter: new PrismaPg(
+      { connectionString: process.env.DATABASE_URL! },
+      { schema: 'aideep' } //FIX: 환경변수로 분리
+    )
   });
 
   get client(): Prisma.TransactionClient {
