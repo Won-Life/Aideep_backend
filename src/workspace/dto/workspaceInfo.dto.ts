@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { workspace_role_enum } from '@prisma/client';
+import { workspace_role_enum } from '../../generated/prisma/client';
 import { IsDate, IsDateString, IsEnum, IsUUID } from 'class-validator';
 import { RawEdgeItem, RawNodeItem } from 'src/node/node.repository';
 

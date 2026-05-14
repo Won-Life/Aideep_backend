@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -19,6 +20,8 @@ import {
   JoinWorkspaceBody as InviteWorkspaceBody,
   InviteWOrkspaceResponseDto
 } from './dto/joinWorkspace.dto';
+import { LeaveWorkspaceBody } from './dto/leaveWorkspace';
+import { workspace_role_enum } from '../generated/prisma/client';
 
 const WORKSPACE_SYNC_TTL = 60 * 10;
 
@@ -59,18 +62,40 @@ export class WorkspaceService {
     return ans;
   }
 
+  @Transactional()
+  async leaveWorkspace(body: LeaveWorkspaceBody, userId: string) {
+    const { workspaceId } = body;
+
+    const membership = await this.workspaceRepository.checkWorkspace(
+      userId,
+      workspaceId
+    );
+    if (!membership || membership.deleted_at) {
+      throw new NotFoundException(
+        '해당 유저의 워크스페이스가 존재하지 않습니다.'
+      );
+    }
+
+    if (membership.role === 'OWNER') {
+      const activeMembers =
+        await this.workspaceRepository.countActiveMembers(workspaceId);
+      if (activeMembers > 1) {
+        throw new BadRequestException(
+          '다른 멤버가 남아 있어 OWNER는 떠날 수 없습니다. 소유권을 이전 하거나, 삭제해주세요.'
+        );
+      }
+      await this.workspaceRepository.softDeleteWorkspace(workspaceId);
+    }
+
+    await this.workspaceRepository.leaveWorkspace(userId, workspaceId);
+    return { workspaceId };
+  }
+
   async getWorkspaceInfo(
     userId: string,
     workspaceId: string
   ): Promise<WorkspaceInfoDto> {
-    const check = await this.workspaceRepository.checkWorkspace(
-      userId,
-      workspaceId
-    );
-    if (check === null)
-      throw new NotFoundException(
-        '해당 유저의 워크스페이스가 존재하지 않습니다.'
-      );
+    await this.checkExist(userId, workspaceId);
 
     const cacheKey = REDIS_KEYS.WORKSPACE_SYNC(workspaceId);
     const cached = await this.redisService.getClient().get(cacheKey);
@@ -85,6 +110,23 @@ export class WorkspaceService {
       .set(cacheKey, JSON.stringify(result), { EX: WORKSPACE_SYNC_TTL });
 
     return result;
+  }
+
+  private async checkExist(
+    userId: string,
+    workspaceId: string,
+    role?: workspace_role_enum
+  ) {
+    const check = await this.workspaceRepository.checkWorkspace(
+      userId,
+      workspaceId
+    );
+    if (check === null)
+      throw new NotFoundException(
+        '해당 유저의 워크스페이스가 존재하지 않습니다.'
+      );
+    if (check.role !== role)
+      throw new BadRequestException('워크스페이스 권한이 일치하지 않습니다.');
   }
 
   async inviteWorkspace(
