@@ -29,4 +29,4 @@ COPY prisma.config.ts ./
 
 EXPOSE 3320
 
-CMD ["sh", "-c", "pnpm prisma db push && node dist/src/main"]
+CMD ["node", "dist/src/main"]
