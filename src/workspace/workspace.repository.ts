@@ -43,10 +43,13 @@ export class WorkspaceRepository {
   }
 
   async checkWorkspace(userId: string, workspaceId: string) {
-    return await this.prisma.client.users_workspaces.findFirst({
+    if (!userId || !workspaceId) return null;
+    return await this.prisma.client.users_workspaces.findUnique({
       where: {
-        user_id: userId,
-        workspace_id: workspaceId
+        user_id_workspace_id: {
+          user_id: userId,
+          workspace_id: workspaceId
+        }
       }
     });
   }

@@ -4,6 +4,8 @@ import { JwtService } from '@nestjs/jwt';
 import { YjsDocManager } from '../yjs/yjs-doc-manager';
 import { YjsWsAwarenessService } from '../yjs/yjs-ws-awareness.service';
 import { WorkspaceRepository } from '../workspace/workspace.repository';
+import { WorkspaceService } from '../workspace/workspace.service';
+import { WsMetricsService } from '../common/metrics';
 import { Socket, Server } from 'socket.io';
 
 describe('WsGateway', () => {
@@ -17,8 +19,8 @@ describe('WsGateway', () => {
         {
           provide: JwtService,
           useValue: {
-            verify: jest.fn(),
-          },
+            verify: jest.fn()
+          }
         },
         {
           provide: YjsDocManager,
@@ -27,24 +29,39 @@ describe('WsGateway', () => {
             addClient: jest.fn(),
             removeClient: jest.fn(),
             scheduleSave: jest.fn(),
-            cleanupNode: jest.fn().mockResolvedValue(undefined),
-          },
+            cleanupNode: jest.fn().mockResolvedValue(undefined)
+          }
         },
         {
           provide: YjsWsAwarenessService,
           useValue: {
             getCachedAwareness: jest.fn().mockResolvedValue(null),
             cacheAwareness: jest.fn().mockResolvedValue(undefined),
-            deleteAwareness: jest.fn().mockResolvedValue(undefined),
-          },
+            deleteAwareness: jest.fn().mockResolvedValue(undefined)
+          }
         },
         {
           provide: WorkspaceRepository,
           useValue: {
-            checkWorkspace: jest.fn(),
-          },
+            checkWorkspace: jest.fn()
+          }
         },
-      ],
+        {
+          provide: WorkspaceService,
+          useValue: {
+            upsertPresence: jest.fn().mockResolvedValue(undefined),
+            removePresence: jest.fn().mockResolvedValue(undefined),
+            listPresence: jest.fn().mockResolvedValue([])
+          }
+        },
+        {
+          provide: WsMetricsService,
+          useValue: {
+            increment: jest.fn(),
+            decrement: jest.fn()
+          }
+        }
+      ]
     }).compile();
 
     gateway = module.get<WsGateway>(WsGateway);
@@ -53,7 +70,7 @@ describe('WsGateway', () => {
     // Inject a mock Server
     gateway.server = {
       to: jest.fn().mockReturnThis(),
-      emit: jest.fn(),
+      emit: jest.fn()
     } as unknown as Server;
   });
 
@@ -66,7 +83,7 @@ describe('WsGateway', () => {
       const client = {
         handshake: { auth: {}, query: {} },
         disconnect: jest.fn(),
-        data: {},
+        data: {}
       } as unknown as Socket;
 
       await gateway.handleConnection(client);
@@ -80,7 +97,7 @@ describe('WsGateway', () => {
       const client = {
         handshake: { auth: { token: 'valid-token' }, query: {} },
         disconnect: jest.fn(),
-        data: {},
+        data: {}
       } as unknown as Socket;
 
       await gateway.handleConnection(client);
@@ -97,7 +114,7 @@ describe('WsGateway', () => {
       const client = {
         handshake: { auth: { token: 'bad-token' }, query: {} },
         disconnect: jest.fn(),
-        data: {},
+        data: {}
       } as unknown as Socket;
 
       await gateway.handleConnection(client);
@@ -111,7 +128,7 @@ describe('WsGateway', () => {
       const client = {
         handshake: { auth: {}, query: { token: 'query-token' } },
         disconnect: jest.fn(),
-        data: {},
+        data: {}
       } as unknown as Socket;
 
       await gateway.handleConnection(client);
@@ -125,12 +142,70 @@ describe('WsGateway', () => {
       const client = {
         join: jest.fn(),
         emit: jest.fn(),
-        data: {},
+        data: { userId: 'user-1' }
       } as unknown as Socket;
 
-      await gateway.handleJoin({ workspaceId: 'ws-abc' }, client);
+      await gateway.handleJoin(
+        {
+          workspaceId: 'ws-abc',
+          userName: 'Alice',
+          color: '#f00',
+          profile: null
+        },
+        client
+      );
       expect(client.join).toHaveBeenCalledWith('ws-abc');
       expect(client.join).toHaveBeenCalledWith('yjs:ws:ws-abc');
+    });
+
+    it('should upsert presence and broadcast presence_state', async () => {
+      const workspaceService = (gateway as unknown as { workspaceService: any })
+        .workspaceService;
+      workspaceService.listPresence.mockResolvedValueOnce([
+        {
+          userId: 'user-1',
+          userName: 'Alice',
+          color: '#f00',
+          profile: null
+        }
+      ]);
+
+      const client = {
+        join: jest.fn(),
+        emit: jest.fn(),
+        data: { userId: 'user-1' }
+      } as unknown as Socket;
+
+      await gateway.handleJoin(
+        {
+          workspaceId: 'ws-abc',
+          userName: 'Alice',
+          color: '#f00',
+          profile: null
+        },
+        client
+      );
+
+      expect(workspaceService.upsertPresence).toHaveBeenCalledWith('ws-abc', {
+        userId: 'user-1',
+        userName: 'Alice',
+        color: '#f00',
+        profile: null
+      });
+      expect(gateway.server.to).toHaveBeenCalledWith('ws-abc');
+      expect(
+        (gateway.server.to('ws-abc') as unknown as { emit: jest.Mock }).emit
+      ).toHaveBeenCalledWith('presence_state', {
+        workspaceId: 'ws-abc',
+        members: [
+          {
+            userId: 'user-1',
+            userName: 'Alice',
+            color: '#f00',
+            profile: null
+          }
+        ]
+      });
     });
   });
 
@@ -138,14 +213,14 @@ describe('WsGateway', () => {
     it('should broadcast node_position_live to the workspace room excluding sender', () => {
       const mockEmit = jest.fn();
       const client = {
-        to: jest.fn().mockReturnValue({ emit: mockEmit }),
+        to: jest.fn().mockReturnValue({ emit: mockEmit })
       } as unknown as Socket;
 
       const payload = {
         workspaceId: 'ws-abc',
         nodeId: 'node-1',
         x: 150,
-        y: 300,
+        y: 300
       };
 
       gateway.handleLivePosition(payload, client);
@@ -157,14 +232,14 @@ describe('WsGateway', () => {
     it('should forward the exact payload without modification', () => {
       const mockEmit = jest.fn();
       const client = {
-        to: jest.fn().mockReturnValue({ emit: mockEmit }),
+        to: jest.fn().mockReturnValue({ emit: mockEmit })
       } as unknown as Socket;
 
       const payload = {
         workspaceId: 'ws-xyz',
         nodeId: 'node-99',
         x: -42.5,
-        y: 1000.123,
+        y: 1000.123
       };
 
       gateway.handleLivePosition(payload, client);
@@ -189,14 +264,14 @@ describe('WsGateway', () => {
           nodeType: 'PROJECT',
           position: { x: 0, y: 0 },
           data: {},
-          createdAt: '2026-01-01',
-        },
+          createdAt: '2026-01-01'
+        }
       };
 
       gateway.broadcast(event);
       expect(gateway.server.to).toHaveBeenCalledWith('ws-abc');
       expect(
-        (gateway.server.to('ws-abc') as unknown as { emit: jest.Mock }).emit,
+        (gateway.server.to('ws-abc') as unknown as { emit: jest.Mock }).emit
       ).toHaveBeenCalledWith('workspace_event', event);
     });
   });

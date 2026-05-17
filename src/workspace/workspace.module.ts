@@ -7,6 +7,7 @@ import { WorkspaceRepository } from './workspace.repository';
 @Module({
   imports: [NodeModule],
   controllers: [WorkspaceController],
-  providers: [WorkspaceService, WorkspaceRepository]
+  providers: [WorkspaceService, WorkspaceRepository],
+  exports: [WorkspaceService]
 })
 export class WorkspaceModule {}

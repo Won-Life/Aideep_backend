@@ -73,6 +73,18 @@ export interface CursorLeaveEvent {
   userId: string;
 }
 
+export interface PresenceMember {
+  userId: string;
+  userName: string;
+  color: string;
+  profile: string | null;
+}
+
+export interface PresenceStateEvent {
+  workspaceId: string;
+  members: PresenceMember[];
+}
+
 // 이벤트 추가 시 여기에 union으로 추가
 
 export type WsEvent =

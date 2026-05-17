@@ -1,4 +1,6 @@
 import {
+  forwardRef,
+  Inject,
   Injectable,
   NotFoundException,
   UnauthorizedException
@@ -24,6 +26,7 @@ export class NodeService {
     private readonly nodeRespository: NodeRepository,
     private readonly workspaceRepository: WorkspaceRepository,
     private readonly edgeRepository: EdgeRepository,
+    @Inject(forwardRef(() => WsGateway))
     private readonly wsGateway: WsGateway,
     private readonly redisService: RedisService
   ) {}
