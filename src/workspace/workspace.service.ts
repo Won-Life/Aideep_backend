@@ -79,14 +79,9 @@ export class WorkspaceService {
     }
 
     if (membership.role === 'OWNER') {
-      const activeMembers =
-        await this.workspaceRepository.countActiveMembers(workspaceId);
-      if (activeMembers > 1) {
-        throw new BadRequestException(
-          '다른 멤버가 남아 있어 OWNER는 떠날 수 없습니다. 소유권을 이전 하거나, 삭제해주세요.'
-        );
-      }
-      await this.workspaceRepository.softDeleteWorkspace(workspaceId);
+      throw new BadRequestException(
+        'OWNER는 워크스페이스를 떠날 수 없습니다. 소유권을 이전하거나 워크스페이스를 삭제해주세요.'
+      );
     }
 
     await this.workspaceRepository.leaveWorkspace(userId, workspaceId);
@@ -123,8 +118,7 @@ export class WorkspaceService {
       throw new NotFoundException(
         '해당 유저의 워크스페이스가 존재하지 않습니다.'
       );
-    // if (check.role !== role)
-    //   throw new BadRequestException('워크스페이스 권한이 일치하지 않습니다.');
+    return check;
   }
 
   async inviteWorkspace(
@@ -136,6 +130,9 @@ export class WorkspaceService {
       userId,
       workspaceId
     );
+
+    const server_url = process.env.SERVER_URL;
+    const api_version = process.env.API_VERSION;
 
     if (!checkHasPerimission || checkHasPerimission.role === 'VIEWER')
       throw new ForbiddenException(
@@ -156,7 +153,7 @@ export class WorkspaceService {
     return {
       code: code,
       //TOOD: baseURL 형식으로 변경
-      url: `http://localhost:3000/workspace/join/${workspaceId}`
+      url: `${server_url}/${api_version}/workspace/join/${workspaceId}`
     };
   }
 
@@ -182,6 +179,30 @@ export class WorkspaceService {
       workspaceId,
       stored.role
     );
+  }
+
+  @Transactional()
+  async deleteWorkspace(workspaceId: string, userId: string) {
+    const check = await this.checkExist(userId, workspaceId);
+
+    if (check.deleted_at)
+      throw new NotFoundException(
+        '해당 유저의 워크스페이스가 존재하지 않습니다.'
+      );
+    if (check.role !== 'OWNER')
+      throw new ForbiddenException(
+        'OWNER가 아닌 유저는 워크스페이스를 삭제할 수 없습니다.'
+      );
+
+    const activeCount =
+      await this.workspaceRepository.countActiveUserWorkspaces(userId);
+    if (activeCount <= 1)
+      throw new BadRequestException(
+        '워크스페이스가 최소 한개는 남아있어야 합니다.'
+      );
+
+    await this.workspaceRepository.softDeleteAllMembers(workspaceId);
+    await this.workspaceRepository.softDeleteWorkspace(workspaceId);
   }
 
   async upsertPresence(

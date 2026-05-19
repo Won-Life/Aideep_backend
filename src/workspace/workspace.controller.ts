@@ -82,7 +82,7 @@ export class WorkspaceController {
   @ApiErrorResponse(404, '해당 유저의 워크스페이스가 존재하지 않습니다.')
   @ApiErrorResponse(
     400,
-    '다른 멤버가 남아 있어 OWNER는 떠날 수 없습니다. 소유권을 이전 하거나, 삭제해주세요.'
+    'OWNER는 워크스페이스를 떠날 수 없습니다. 소유권을 이전하거나 워크스페이스를 삭제해주세요.'
   )
   async leaveWorkspace(@Request() req: any, @Body() body: LeaveWorkspaceBody) {
     const userId = req.user?.user_id;
@@ -109,6 +109,34 @@ export class WorkspaceController {
     const userId = req.user?.user_id;
     await this.workspaceService.joinWorkspace(body.code, userId, workspaceId);
     return '참가 성공';
+  }
+
+  @Delete('/:workspaceId')
+  @ApiOperation({
+    summary: '워크스페이스 삭제',
+    description:
+      'OWNER 유저가 워크스페이스를 soft-delete 합니다. 워크스페이스와 모든 멤버십 행이 함께 삭제됩니다.'
+  })
+  @ApiSuccessResponse(
+    {
+      type: 'string',
+      example: '삭제 성공'
+    },
+    200
+  )
+  @ApiErrorResponse(404, '해당 유저의 워크스페이스가 존재하지 않습니다.')
+  @ApiErrorResponse(
+    403,
+    'OWNER가 아닌 유저는 워크스페이스를 삭제할 수 없습니다.'
+  )
+  @ApiErrorResponse(400, '워크스페이스가 최소 한개는 남아있어야 합니다.')
+  async deleteWorkspace(
+    @Request() req: any,
+    @Param('workspaceId') workspaceId: string
+  ) {
+    const userId = req.user.user_id;
+    await this.workspaceService.deleteWorkspace(workspaceId, userId);
+    return '삭제 성공';
   }
 
   @Get('sync')

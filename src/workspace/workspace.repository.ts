@@ -65,19 +65,23 @@ export class WorkspaceRepository {
     });
   }
 
-  async countActiveMembers(workspaceId: string): Promise<number> {
-    return await this.prisma.client.users_workspaces.count({
-      where: {
-        workspace_id: workspaceId,
-        deleted_at: null
-      }
-    });
-  }
-
   async softDeleteWorkspace(workspaceId: string) {
     return await this.prisma.client.workspaces.update({
       where: { workspace_id: workspaceId },
       data: { deleted_at: new Date() }
+    });
+  }
+
+  async softDeleteAllMembers(workspaceId: string) {
+    return await this.prisma.client.users_workspaces.updateMany({
+      where: { workspace_id: workspaceId, deleted_at: null },
+      data: { deleted_at: new Date() }
+    });
+  }
+
+  async countActiveUserWorkspaces(userId: string): Promise<number> {
+    return await this.prisma.client.users_workspaces.count({
+      where: { user_id: userId, deleted_at: null }
     });
   }
 }
