@@ -68,6 +68,13 @@ export class WorkspaceRepository {
     });
   }
 
+  async updateWorkspaceTitle(workspaceId: string, title: string) {
+    return await this.prisma.client.workspaces.update({
+      where: { workspace_id: workspaceId },
+      data: { title: title }
+    });
+  }
+
   async softDeleteWorkspace(workspaceId: string) {
     return await this.prisma.client.workspaces.update({
       where: { workspace_id: workspaceId },

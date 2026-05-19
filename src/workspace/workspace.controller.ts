@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   Request,
@@ -27,6 +28,7 @@ import {
   LeaveWorkspaceBody,
   LeaveWorkspaceResponseDto
 } from './dto/leaveWorkspace.dto';
+import { RenameWorkspaceBody } from './dto/renameWorkspace.dto';
 
 @Controller('workspace')
 @UseGuards(JwtAuthGuard)
@@ -42,6 +44,31 @@ export class WorkspaceController {
   async workspaceList(@Request() req: any): Promise<UserWokrpaceInfoDto[]> {
     const userId = req.user?.user_id;
     return await this.workspaceService.userWorkspaceInfo(userId);
+  }
+
+  @Patch('/:workspaceId')
+  @ApiOperation({
+    summary: '워크스페이스 이름 변경',
+    description: 'OWNER 유저가 워크스페이스의 title을 변경합니다.'
+  })
+  @ApiBody({ type: RenameWorkspaceBody })
+  @ApiSuccessResponse(
+    {
+      type: 'string',
+      example: '이름 변경 성공'
+    },
+    200
+  )
+  @ApiErrorResponse(404, '해당 유저의 워크스페이스가 존재하지 않습니다.')
+  @ApiErrorResponse(403, 'OWNER만 워크스페이스 이름을 변경할 수 있습니다.')
+  async renameWorkspace(
+    @Request() req: any,
+    @Param('workspaceId') workspaceId: string,
+    @Body() body: RenameWorkspaceBody
+  ) {
+    const userId = req.user?.user_id;
+    await this.workspaceService.renameWorkspace(userId, workspaceId, body);
+    return '이름 변경 성공';
   }
 
   @Post('/')

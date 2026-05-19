@@ -23,6 +23,7 @@ import {
 import { LeaveWorkspaceBody } from './dto/leaveWorkspace.dto';
 import { workspace_role_enum } from '../generated/prisma/client';
 import { PresenceMember } from '../ws/ws.event';
+import { RenameWorkspaceBody } from './dto/renameWorkspace.dto';
 
 const WORKSPACE_SYNC_TTL = 60 * 10;
 const WS_PRESENCE_TTL_SEC = 60 * 60 * 24;
@@ -203,6 +204,25 @@ export class WorkspaceService {
 
     await this.workspaceRepository.softDeleteAllMembers(workspaceId);
     await this.workspaceRepository.softDeleteWorkspace(workspaceId);
+  }
+
+  async renameWorkspace(
+    userId: string,
+    workspaceId: string,
+    body: RenameWorkspaceBody
+  ) {
+    const check = await this.checkExist(userId, workspaceId);
+    if (check.deleted_at)
+      throw new NotFoundException(
+        '해당 유저의 워크스페이스가 존재하지 않습니다.'
+      );
+    if (check.role !== 'OWNER')
+      throw new ForbiddenException(
+        'OWNER만 워크스페이스 이름을 변경할 수 있습니다.'
+      );
+
+    const { title } = body;
+    await this.workspaceRepository.updateWorkspaceTitle(workspaceId, title);
   }
 
   async upsertPresence(
