@@ -10,7 +10,8 @@ export class WorkspaceRepository {
   async selectUserWorkspace(userId: string) {
     return await this.prisma.client.users_workspaces.findMany({
       where: {
-        user_id: userId
+        user_id: userId,
+        deleted_at: null
       },
       include: {
         workspaces: {
@@ -49,7 +50,8 @@ export class WorkspaceRepository {
         user_id_workspace_id: {
           user_id: userId,
           workspace_id: workspaceId
-        }
+        },
+        deleted_at: null
       }
     });
   }
@@ -59,7 +61,8 @@ export class WorkspaceRepository {
         user_id_workspace_id: {
           user_id: userId,
           workspace_id: workspaceId
-        }
+        },
+        deleted_at: null
       },
       data: { deleted_at: new Date() }
     });
