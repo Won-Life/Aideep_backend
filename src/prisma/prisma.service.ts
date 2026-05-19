@@ -30,8 +30,8 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   private readonly prisma = new PrismaClient({
     adapter: new PrismaPg(
-      { connectionString: process.env.DATABASE_URL! },
-      { schema: 'aideep' } //FIX: 환경변수로 분리
+      { connectionString: process.env.DATABASE_URL },
+      { schema: process.env.DATABASE_SCHEMA } //FIX: 환경변수로 분리
     )
   }).$extends({
     query: {
