@@ -9,13 +9,15 @@ import {
   Request,
   Inject,
   LoggerService,
-  Delete
+  Delete,
+  Query
 } from '@nestjs/common';
 import { NodeService } from './node.service';
 import {
   ApiBearerAuth,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiTags
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guards/jwt.guard';
@@ -28,6 +30,7 @@ import { Node } from './node.model';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { ApiSuccessResponse } from 'src/common/response/api-success-response.decorator';
 import { NodeDetailDto } from './dto/nodeDetail.dto';
+import { NodeSearchResponseDto } from './dto/nodeSearch.dto';
 
 @ApiTags('Node')
 @Controller('workspace/:workspaceId/node')
@@ -77,6 +80,45 @@ export class NodeController {
     console.log(node);
     const nodeId = await this.nodeService.createMarkdownNode(node);
     return { nodeId };
+  }
+
+  @Get('search')
+  @ApiOperation({
+    summary: '노드 검색',
+    description:
+      '워크스페이스 내 노드를 title + content(JSON 전체 평탄화) 기준으로 substring + trigram similarity 검색합니다. FEATURE_FTS=true 시 GIN 인덱스 기반 가속 + ranking + snippet + cursor 페이지네이션.'
+  })
+  @ApiQuery({
+    name: 'q',
+    description: '검색어 (1~200자)',
+    required: true,
+    type: String
+  })
+  @ApiQuery({
+    name: 'limit',
+    description: '결과 수 (기본 50, 최대 100)',
+    required: false,
+    type: Number
+  })
+  @ApiQuery({
+    name: 'cursor',
+    description: '다음 페이지 cursor (이전 응답의 nextCursor)',
+    required: false,
+    type: String
+  })
+  @ApiSuccessResponse(NodeSearchResponseDto, 200, '노드 검색 성공')
+  async searchNodes(
+    @Param('workspaceId') workspaceId: string,
+    @Query('q') query: string,
+    @Request() req: any,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string
+  ): Promise<NodeSearchResponseDto> {
+    const userId = req.user?.user_id;
+    return await this.nodeService.searchNodes(workspaceId, query, userId, {
+      limit: limit !== undefined ? Number(limit) : undefined,
+      cursor
+    });
   }
 
   @Get(':nodeId')

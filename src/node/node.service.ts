@@ -1,11 +1,16 @@
 import {
+  BadRequestException,
   forwardRef,
   Inject,
   Injectable,
   NotFoundException,
   UnauthorizedException
 } from '@nestjs/common';
-import { NodeRepository } from './node.repository';
+import { NodeRepository, FtsRow } from './node.repository';
+import {
+  NodeSearchResponseDto,
+  NodeSearchResultDto
+} from './dto/nodeSearch.dto';
 import { WorkspaceRepository } from 'src/workspace/workspace.repository';
 import { EdgeRepository } from 'src/edge/edge.repository';
 import { Node } from './node.model';
@@ -285,6 +290,107 @@ export class NodeService {
         }
       }
     }
+  }
+
+  private async checkExist(userId: string, workspaceId: string) {
+    const check = await this.workspaceRepository.checkWorkspace(
+      userId,
+      workspaceId
+    );
+    if (check === null)
+      throw new NotFoundException(
+        '해당 유저의 워크스페이스가 존재하지 않습니다.'
+      );
+    return check;
+  }
+
+  async searchByExactMatch(workspaceId: string, query: string, userId: string) {
+    await this.checkExist(userId, workspaceId);
+
+    return await this.nodeRespository.searchByQuery(workspaceId, query);
+  }
+
+  async searchNodes(
+    workspaceId: string,
+    rawQuery: string,
+    userId: string,
+    options: { limit?: number; cursor?: string } = {}
+  ): Promise<NodeSearchResponseDto> {
+    await this.checkExist(userId, workspaceId);
+
+    const query = (rawQuery ?? '').trim();
+    if (query.length < 1) {
+      throw new BadRequestException('검색어는 1자 이상이어야 합니다.');
+    }
+    if (query.length > 200) {
+      throw new BadRequestException('검색어는 200자 이하여야 합니다.');
+    }
+
+    const limit = Math.min(Math.max(options.limit ?? 50, 1), 100);
+
+    if (process.env.FEATURE_FTS !== 'true') {
+      const rows = await this.nodeRespository.searchByQuery(workspaceId, query);
+      const items = rows.slice(0, limit).map<NodeSearchResultDto>((r) => ({
+        nodeId: r.node_id,
+        workspaceId: r.workspace_id,
+        title: r.title,
+        nodeType: r.node_type as string,
+        depth: r.depth,
+        positionX: r.position_x,
+        positionY: r.position_y,
+        version: r.version,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+        score: 1,
+        snippet: ''
+      }));
+      return { items, nextCursor: null };
+    }
+
+    const cursor = this.parseCursor(options.cursor);
+    const rows = await this.nodeRespository.searchByFts(
+      workspaceId,
+      query,
+      limit,
+      cursor
+    );
+
+    const hasMore = rows.length > limit;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+    const last = page[page.length - 1];
+    const nextCursor = hasMore && last ? `${last.score}|${last.nodeId}` : null;
+
+    return {
+      items: page.map<NodeSearchResultDto>((r) => this.toDto(r)),
+      nextCursor
+    };
+  }
+
+  private toDto(r: FtsRow): NodeSearchResultDto {
+    return {
+      nodeId: r.nodeId,
+      workspaceId: r.workspaceId,
+      title: r.title,
+      nodeType: r.nodeType,
+      depth: r.depth,
+      positionX: r.positionX,
+      positionY: r.positionY,
+      version: r.version,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+      score: r.score,
+      snippet: r.snippet ?? ''
+    };
+  }
+
+  private parseCursor(raw?: string): { score: number; nodeId: string } | null {
+    if (!raw) return null;
+    const [scoreStr, nodeId] = raw.split('|');
+    const score = Number(scoreStr);
+    if (!nodeId || Number.isNaN(score)) {
+      throw new BadRequestException('잘못된 cursor 형식입니다.');
+    }
+    return { score, nodeId };
   }
 
   async propagateDepth(

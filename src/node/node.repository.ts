@@ -4,6 +4,21 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { Node } from './node.model';
 import { tree } from 'lib0';
 
+export type FtsRow = {
+  nodeId: string;
+  workspaceId: string;
+  title: string | null;
+  nodeType: string;
+  depth: number | null;
+  positionX: number | null;
+  positionY: number | null;
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+  score: number;
+  snippet: string;
+};
+
 export type RawNodeItem = Prisma.nodesGetPayload<{
   select: {
     node_id: true;
@@ -213,6 +228,116 @@ export class NodeRepository {
         version: { increment: 1 }
       }
     });
+  }
+
+  async searchByQuery(
+    workspaceId: string,
+    query: string
+  ): Promise<RawNodeItem[]> {
+    return await this.prisma.client.nodes.findMany({
+      select: {
+        node_id: true,
+        title: true,
+        node_type: true,
+        content: true,
+        version: true,
+        created_at: true,
+        updated_at: true,
+        deleted_at: true,
+        position_x: true,
+        position_y: true,
+        workspace_id: true,
+        depth: true
+      },
+      where: {
+        workspace_id: workspaceId,
+        deleted_at: null,
+        OR: [
+          { title: { contains: query } },
+          {
+            content: {
+              string_contains: query
+            }
+          }
+        ]
+      }
+    });
+  }
+
+  async searchByFts(
+    workspaceId: string,
+    query: string,
+    limit: number,
+    cursor: { score: number; nodeId: string } | null
+  ): Promise<FtsRow[]> {
+    const fetchSize = limit + 1;
+    const rows = cursor
+      ? await this.prisma.client.$queryRaw<FtsRow[]>`
+          SELECT
+            node_id      AS "nodeId",
+            workspace_id AS "workspaceId",
+            title,
+            node_type    AS "nodeType",
+            depth,
+            position_x   AS "positionX",
+            position_y   AS "positionY",
+            version,
+            created_at   AS "createdAt",
+            updated_at   AS "updatedAt",
+            similarity(search_text, ${query})::float AS score,
+            CASE
+              WHEN position(lower(${query}) in lower(search_text)) > 0
+                THEN substring(
+                  search_text
+                  FROM greatest(1, position(lower(${query}) in lower(search_text)) - 40)
+                  FOR 120
+                )
+              ELSE left(coalesce(search_text, ''), 120)
+            END AS snippet
+          FROM nodes
+          WHERE workspace_id = ${workspaceId}::uuid
+            AND deleted_at IS NULL
+            AND search_text % ${query}
+            AND (
+              similarity(search_text, ${query}) < ${cursor.score}
+              OR (
+                similarity(search_text, ${query}) = ${cursor.score}
+                AND node_id > ${cursor.nodeId}::uuid
+              )
+            )
+          ORDER BY score DESC, "nodeId" ASC
+          LIMIT ${fetchSize}
+        `
+      : await this.prisma.client.$queryRaw<FtsRow[]>`
+          SELECT
+            node_id      AS "nodeId",
+            workspace_id AS "workspaceId",
+            title,
+            node_type    AS "nodeType",
+            depth,
+            position_x   AS "positionX",
+            position_y   AS "positionY",
+            version,
+            created_at   AS "createdAt",
+            updated_at   AS "updatedAt",
+            similarity(search_text, ${query})::float AS score,
+            CASE
+              WHEN position(lower(${query}) in lower(search_text)) > 0
+                THEN substring(
+                  search_text
+                  FROM greatest(1, position(lower(${query}) in lower(search_text)) - 40)
+                  FOR 120
+                )
+              ELSE left(coalesce(search_text, ''), 120)
+            END AS snippet
+          FROM nodes
+          WHERE workspace_id = ${workspaceId}::uuid
+            AND deleted_at IS NULL
+            AND search_text % ${query}
+          ORDER BY score DESC, "nodeId" ASC
+          LIMIT ${fetchSize}
+        `;
+    return rows;
   }
 
   async deleteNode(nodeId: string) {
