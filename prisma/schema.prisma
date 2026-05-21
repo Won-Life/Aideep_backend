@@ -1,8 +1,9 @@
 generator client {
-  provider     = "prisma-client"
-  output       = "../src/generated/prisma"
-  moduleFormat = "cjs"
-  runtime      = "nodejs"
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["partialIndexes"]
+  moduleFormat    = "cjs"
+  runtime         = "nodejs"
 }
 
 datasource db {
@@ -44,22 +45,26 @@ model nodes {
   workspace_id                 String         @db.Uuid
   depth                        Int?           @default(0)
   yjs_state                    Bytes?
+  search_text                  String?        @default(dbgenerated("(((COALESCE(title, ''::character varying))::text || ' '::text) || COALESCE((content ->> 'markdownBody'::text), ''::text))"))
   edges_edges_source_idTonodes edges[]        @relation("edges_source_idTonodes")
   edges_edges_target_idTonodes edges[]        @relation("edges_target_idTonodes")
   workspaces                   workspaces     @relation(fields: [workspace_id], references: [workspace_id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([workspace_id], map: "idx_nodes_workspace")
   @@index([workspace_id, updated_at], map: "idx_nodes_workspace_updated")
+  @@index([search_text(ops: raw("gin_trgm_ops"))], map: "idx_nodes_search_trgm", type: Gin, where: raw("(deleted_at IS NULL)"))
 }
 
 model users {
   user_id          String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email            String             @unique @db.VarChar(255)
   username         String             @db.VarChar(100)
-  password         String             @db.VarChar(255)
+  password         String?            @db.VarChar(255)
   created_at       DateTime           @default(now()) @db.Timestamptz(6)
   updated_at       DateTime           @default(now()) @db.Timestamptz(6)
   deleted_at       DateTime?          @db.Timestamptz(6)
+  files            files[]
+  oauth_accounts   oauth_accounts[]
   users_workspaces users_workspaces[]
 }
 
@@ -82,8 +87,43 @@ model workspaces {
   updated_at       DateTime           @default(now()) @db.Timestamptz(6)
   deleted_at       DateTime?          @db.Timestamptz(6)
   edges            edges[]
+  files            files[]
   nodes            nodes[]
   users_workspaces users_workspaces[]
+}
+
+model files {
+  file_id       String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  file_url      String     @db.VarChar(2048)
+  s3_key        String     @db.VarChar(1024)
+  mime_type     String     @db.VarChar(100)
+  size          Int
+  owner_user_id String     @db.Uuid
+  workspace_id  String     @db.Uuid
+  created_at    DateTime   @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime   @default(now()) @db.Timestamptz(6)
+  deleted_at    DateTime?  @db.Timestamptz(6)
+  users         users      @relation(fields: [owner_user_id], references: [user_id], onUpdate: NoAction)
+  workspaces    workspaces @relation(fields: [workspace_id], references: [workspace_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([owner_user_id], map: "idx_files_owner")
+  @@index([workspace_id], map: "idx_files_workspace")
+}
+
+model oauth_accounts {
+  oauth_account_id String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id          String    @db.Uuid
+  provider         String    @db.VarChar(50)
+  provider_user_id String    @db.VarChar(255)
+  email            String?   @db.VarChar(255)
+  created_at       DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime  @default(now()) @db.Timestamptz(6)
+  deleted_at       DateTime? @db.Timestamptz(6)
+  users            users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([provider, provider_user_id], map: "uq_oauth_accounts_provider_subject")
+  @@unique([user_id, provider], map: "uq_oauth_accounts_user_provider")
+  @@index([user_id], map: "idx_oauth_accounts_user")
 }
 
 enum node_type_enum {

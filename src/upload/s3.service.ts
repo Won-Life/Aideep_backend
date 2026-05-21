@@ -104,6 +104,13 @@ export class S3Service {
   }
 
   /**
+   * S3 key로 공개 URL을 반환합니다.
+   */
+  getPublicUrl(key: string): string {
+    return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}`;
+  }
+
+  /**
    * URL에서 S3 key를 추출합니다.
    */
   extractKeyFromUrl(url: string): string {
@@ -112,9 +119,5 @@ export class S3Service {
       throw new Error(`Invalid S3 URL format: ${url}`);
     }
     return url.slice(bucketUrl.length);
-  }
-
-  private getPublicUrl(key: string): string {
-    return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}`;
   }
 }

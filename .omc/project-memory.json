@@ -1,0 +1,296 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1779386032013,
+  "projectRoot": "/Users/seoki/workspace/aideep/.worktrees/issue-31",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": ">=22",
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "@nestjs/core",
+        "version": "11.0.1",
+        "category": "backend"
+      },
+      {
+        "name": "jest",
+        "version": "30.0.0",
+        "category": "testing"
+      }
+    ],
+    "packageManager": "pnpm",
+    "runtime": "Node.js 22"
+  },
+  "build": {
+    "buildCommand": "pnpm build 2>&1 | tail -20",
+    "testCommand": "pnpm exec jest --config test/jest-e2e.json --testPathPatterns=upload --runInBand 2>&1 | tail -20",
+    "lintCommand": "pnpm lint",
+    "devCommand": "pnpm start",
+    "scripts": {
+      "build": "nest build",
+      "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+      "start": "nest start",
+      "start:dev": "nest start --watch",
+      "start:debug": "nest start --debug --watch",
+      "start:prod": "node dist/main",
+      "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+      "test": "jest",
+      "test:watch": "jest --watch",
+      "test:cov": "jest --coverage",
+      "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+      "test:e2e": "jest --config ./test/jest-e2e.json"
+    }
+  },
+  "conventions": {
+    "namingStyle": "camelCase/PascalCase",
+    "importStyle": "ES modules",
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "docs",
+      "scripts",
+      "src",
+      "test"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "dist": {
+      "path": "dist",
+      "purpose": "Distribution/build output",
+      "fileCount": 4,
+      "lastAccessed": 1779386031982,
+      "keyFiles": [
+        "prisma.config.d.ts",
+        "prisma.config.js",
+        "prisma.config.js.map",
+        "tsconfig.build.tsbuildinfo"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 0,
+      "lastAccessed": 1779386031983,
+      "keyFiles": []
+    },
+    "mock": {
+      "path": "mock",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1779386031991,
+      "keyFiles": []
+    },
+    "prisma": {
+      "path": "prisma",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1779386031993,
+      "keyFiles": [
+        "schema.prisma"
+      ]
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 2,
+      "lastAccessed": 1779386031993,
+      "keyFiles": [
+        "prune-hub-tags.sh",
+        "prune-local-images.sh"
+      ]
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 5,
+      "lastAccessed": 1779386031993,
+      "keyFiles": [
+        "app.controller.spec.ts",
+        "app.controller.ts",
+        "app.module.ts",
+        "app.service.ts",
+        "main.ts"
+      ]
+    },
+    "test": {
+      "path": "test",
+      "purpose": "Test files",
+      "fileCount": 2,
+      "lastAccessed": 1779386031994,
+      "keyFiles": [
+        "app.e2e-spec.ts",
+        "jest-e2e.json"
+      ]
+    },
+    "dist/src": {
+      "path": "dist/src",
+      "purpose": "Source code",
+      "fileCount": 12,
+      "lastAccessed": 1779386031994,
+      "keyFiles": [
+        "app.controller.d.ts",
+        "app.controller.js",
+        "app.controller.js.map"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "src/upload/upload.service.ts",
+      "accessCount": 10,
+      "lastAccessed": 1779387854331,
+      "type": "file"
+    },
+    {
+      "path": "src/upload/upload.controller.ts",
+      "accessCount": 9,
+      "lastAccessed": 1779387853869,
+      "type": "file"
+    },
+    {
+      "path": "src/upload/s3.service.ts",
+      "accessCount": 8,
+      "lastAccessed": 1779387854729,
+      "type": "file"
+    },
+    {
+      "path": "prisma/schema.prisma",
+      "accessCount": 8,
+      "lastAccessed": 1779389458496,
+      "type": "file"
+    },
+    {
+      "path": "src/upload/constant/upload.constant.ts",
+      "accessCount": 6,
+      "lastAccessed": 1779387858777,
+      "type": "file"
+    },
+    {
+      "path": "src/upload/dto/upload-response.dto.ts",
+      "accessCount": 5,
+      "lastAccessed": 1779387861560,
+      "type": "file"
+    },
+    {
+      "path": "src/upload/upload.controller.spec.ts",
+      "accessCount": 5,
+      "lastAccessed": 1779388233260,
+      "type": "file"
+    },
+    {
+      "path": "src/upload/upload.module.ts",
+      "accessCount": 4,
+      "lastAccessed": 1779387857721,
+      "type": "file"
+    },
+    {
+      "path": "src/upload/s3.service.spec.ts",
+      "accessCount": 4,
+      "lastAccessed": 1779388221528,
+      "type": "file"
+    },
+    {
+      "path": "src/upload/upload.service.spec.ts",
+      "accessCount": 3,
+      "lastAccessed": 1779388185464,
+      "type": "file"
+    },
+    {
+      "path": "src/upload/dto/upload-many-response.dto.ts",
+      "accessCount": 2,
+      "lastAccessed": 1779387862045,
+      "type": "file"
+    },
+    {
+      "path": "test/upload.e2e-spec.ts",
+      "accessCount": 2,
+      "lastAccessed": 1779388312959,
+      "type": "file"
+    },
+    {
+      "path": "test/jest-e2e.json",
+      "accessCount": 2,
+      "lastAccessed": 1779388327630,
+      "type": "file"
+    },
+    {
+      "path": "docs/pre/2026-05-21-upload-refactor.md",
+      "accessCount": 1,
+      "lastAccessed": 1779386131234,
+      "type": "file"
+    },
+    {
+      "path": "docs/pre/2026-05-22-upload-revert-direct.md",
+      "accessCount": 1,
+      "lastAccessed": 1779386132359,
+      "type": "file"
+    },
+    {
+      "path": "docs/pr/2026-05-22-upload-revert-direct.md",
+      "accessCount": 1,
+      "lastAccessed": 1779386132842,
+      "type": "file"
+    },
+    {
+      "path": "docs/pre/2026-05-22-upload-multi-review.md",
+      "accessCount": 1,
+      "lastAccessed": 1779386190508,
+      "type": "file"
+    },
+    {
+      "path": "docs/pr/2026-05-22-upload-multi-review.md",
+      "accessCount": 1,
+      "lastAccessed": 1779386503579,
+      "type": "file"
+    },
+    {
+      "path": "docs/pre/2026-05-22-upload-p0-fix.md",
+      "accessCount": 1,
+      "lastAccessed": 1779387686814,
+      "type": "file"
+    },
+    {
+      "path": "package.json",
+      "accessCount": 1,
+      "lastAccessed": 1779387866099,
+      "type": "file"
+    },
+    {
+      "path": "docs/pr/2026-05-22-upload-p0-fix.md",
+      "accessCount": 1,
+      "lastAccessed": 1779388702428,
+      "type": "file"
+    },
+    {
+      "path": "docs/migrations/2026-05-22-upload-files.sql",
+      "accessCount": 1,
+      "lastAccessed": 1779389247325,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}
