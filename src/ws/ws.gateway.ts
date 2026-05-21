@@ -11,14 +11,15 @@ import {
 import { Server, Namespace, Socket } from 'socket.io';
 import { instrument } from '@socket.io/admin-ui';
 import { JwtService } from '@nestjs/jwt';
-import { Logger } from '@nestjs/common';
+import { forwardRef, Inject, Logger } from '@nestjs/common';
 import * as syncProtocol from 'y-protocols/sync';
 import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
-import { WsEvent } from './ws.event';
+import { PresenceStateEvent, WsEvent } from './ws.event';
 import { YjsDocManager } from '../yjs/yjs-doc-manager';
 import { YjsWsAwarenessService } from '../yjs/yjs-ws-awareness.service';
 import { WorkspaceRepository } from '../workspace/workspace.repository';
+import { WorkspaceService } from '../workspace/workspace.service';
 import { WsMetricsService } from '../common/metrics';
 import {
   YJS_EVENT,
@@ -47,6 +48,8 @@ export class WsGateway
     private readonly yjsDocManager: YjsDocManager,
     private readonly yjsWsAwareness: YjsWsAwarenessService,
     private readonly workspaceRepository: WorkspaceRepository,
+    @Inject(forwardRef(() => WorkspaceService))
+    private readonly workspaceService: WorkspaceService,
     private readonly wsMetrics: WsMetricsService
   ) {}
 
@@ -76,20 +79,24 @@ export class WsGateway
       const payload = this.jwtService.verify(token);
       client.data.userId = payload.user_id;
       this.wsMetrics.increment();
-    } catch {
+    } catch (err) {
       client.disconnect();
     }
   }
 
-  handleDisconnect(client: Socket) {
+  async handleDisconnect(client: Socket) {
     if (client.data?.userId) {
       this.wsMetrics.decrement();
     }
     const workspaceId = client.data?.workspaceId;
+    const userId = client.data?.userId;
     if (workspaceId) {
-      client.to(workspaceId).emit('cursor_leave', {
-        userId: client.data.userId
-      });
+      client.to(workspaceId).emit('cursor_leave', { userId });
+
+      if (userId) {
+        await this.workspaceService.removePresence(workspaceId, userId);
+        await this.broadcastPresence(workspaceId);
+      }
     }
 
     // Yjs cleanup: 모든 참여 중인 doc에서 제거
@@ -102,15 +109,41 @@ export class WsGateway
     }
   }
 
+  private async broadcastPresence(workspaceId: string): Promise<void> {
+    const members = await this.workspaceService.listPresence(workspaceId);
+    const event: PresenceStateEvent = { workspaceId, members };
+    this.server.to(workspaceId).emit('presence_state', event);
+  }
+
   // ── 기존 이벤트 (변경 없음) ───────────────────────────────────
 
   @SubscribeMessage('join_workspace')
   async handleJoin(
-    @MessageBody() payload: { workspaceId: string },
+    @MessageBody()
+    payload: {
+      workspaceId: string;
+      userName: string;
+      color: string;
+      profile?: string | null;
+    },
     @ConnectedSocket() client: Socket
   ) {
     this.logger.debug('조인완료');
-    const { workspaceId } = payload;
+    const { workspaceId, userName, color, profile = null } = payload;
+    const userId = client.data.userId;
+
+    if (!userId) {
+      return { ok: false, error: '로그인이 필요합니다.' };
+    }
+
+    const membership = await this.workspaceRepository.checkWorkspace(
+      userId,
+      workspaceId
+    );
+
+    if (!membership) {
+      return { ok: false, error: '워크스페이스 멤버가 아닙니다' };
+    }
 
     client.join(workspaceId);
     client.data.workspaceId = workspaceId;
@@ -126,6 +159,16 @@ export class WsGateway
         data: Array.from(new Uint8Array(cached))
       });
     }
+
+    await this.workspaceService.upsertPresence(workspaceId, {
+      userId,
+      userName,
+      color,
+      profile
+    });
+    await this.broadcastPresence(workspaceId);
+
+    return { ok: true };
   }
 
   @SubscribeMessage('node_position_live')

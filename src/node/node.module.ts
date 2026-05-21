@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { NodeService } from './node.service';
 import { NodeController } from './node.controller';
 import { NodeRepository } from './node.repository';
@@ -7,7 +7,7 @@ import { EdgeRepository } from 'src/edge/edge.repository';
 import { WsModule } from 'src/ws/ws.module';
 
 @Module({
-  imports: [WsModule],
+  imports: [forwardRef(() => WsModule)],
   controllers: [NodeController],
   providers: [NodeService, NodeRepository, WorkspaceRepository, EdgeRepository],
   exports: [NodeRepository, NodeService]

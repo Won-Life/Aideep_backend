@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   Request,
@@ -11,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/guards/jwt.guard';
 import { ApiBearerAuth, ApiBody, ApiOperation } from '@nestjs/swagger';
+import { ApiErrorResponse } from 'src/common/response/api-error-response.decorator';
 import {
   CreateWorkspaceBody,
   CreateWorkspaceResponseDto
@@ -22,7 +24,11 @@ import {
 } from './dto/joinWorkspace.dto';
 import { ApiSuccessResponse } from 'src/common/response/api-success-response.decorator';
 import { UserWokrpaceInfoDto, WorkspaceInfoDto } from './dto/workspaceInfo.dto';
-import { LeaveWorkspaceBody } from './dto/leaveWorkspace';
+import {
+  LeaveWorkspaceBody,
+  LeaveWorkspaceResponseDto
+} from './dto/leaveWorkspace.dto';
+import { RenameWorkspaceBody } from './dto/renameWorkspace.dto';
 
 @Controller('workspace')
 @UseGuards(JwtAuthGuard)
@@ -38,6 +44,31 @@ export class WorkspaceController {
   async workspaceList(@Request() req: any): Promise<UserWokrpaceInfoDto[]> {
     const userId = req.user?.user_id;
     return await this.workspaceService.userWorkspaceInfo(userId);
+  }
+
+  @Patch('/:workspaceId')
+  @ApiOperation({
+    summary: '워크스페이스 이름 변경',
+    description: 'OWNER 유저가 워크스페이스의 title을 변경합니다.'
+  })
+  @ApiBody({ type: RenameWorkspaceBody })
+  @ApiSuccessResponse(
+    {
+      type: 'string',
+      example: '이름 변경 성공'
+    },
+    200
+  )
+  @ApiErrorResponse(404, '해당 유저의 워크스페이스가 존재하지 않습니다.')
+  @ApiErrorResponse(403, 'OWNER만 워크스페이스 이름을 변경할 수 있습니다.')
+  async renameWorkspace(
+    @Request() req: any,
+    @Param('workspaceId') workspaceId: string,
+    @Body() body: RenameWorkspaceBody
+  ) {
+    const userId = req.user?.user_id;
+    await this.workspaceService.renameWorkspace(userId, workspaceId, body);
+    return '이름 변경 성공';
   }
 
   @Post('/')
@@ -69,14 +100,16 @@ export class WorkspaceController {
 
   @Delete('/leave')
   @ApiOperation({
-    summary: '특정 워크스페이스를 떠납니다.'
+    summary: '특정 워크스페이스를 떠납니다.',
+    description:
+      '현재 유저를 해당 워크스페이스에서 제거합니다. OWNER인 경우 다른 멤버가 남아 있으면 떠날 수 없으며, 마지막 OWNER가 떠나면 워크스페이스는 soft delete 됩니다.'
   })
-  @ApiSuccessResponse(
-    {
-      type: 'object',
-      properties: { workspaceId: { type: 'string' } }
-    },
-    200
+  @ApiBody({ type: LeaveWorkspaceBody })
+  @ApiSuccessResponse(LeaveWorkspaceResponseDto, 200)
+  @ApiErrorResponse(404, '해당 유저의 워크스페이스가 존재하지 않습니다.')
+  @ApiErrorResponse(
+    400,
+    'OWNER는 워크스페이스를 떠날 수 없습니다. 소유권을 이전하거나 워크스페이스를 삭제해주세요.'
   )
   async leaveWorkspace(@Request() req: any, @Body() body: LeaveWorkspaceBody) {
     const userId = req.user?.user_id;
@@ -103,6 +136,34 @@ export class WorkspaceController {
     const userId = req.user?.user_id;
     await this.workspaceService.joinWorkspace(body.code, userId, workspaceId);
     return '참가 성공';
+  }
+
+  @Delete('/:workspaceId')
+  @ApiOperation({
+    summary: '워크스페이스 삭제',
+    description:
+      'OWNER 유저가 워크스페이스를 soft-delete 합니다. 워크스페이스와 모든 멤버십 행이 함께 삭제됩니다.'
+  })
+  @ApiSuccessResponse(
+    {
+      type: 'string',
+      example: '삭제 성공'
+    },
+    200
+  )
+  @ApiErrorResponse(404, '해당 유저의 워크스페이스가 존재하지 않습니다.')
+  @ApiErrorResponse(
+    403,
+    'OWNER가 아닌 유저는 워크스페이스를 삭제할 수 없습니다.'
+  )
+  @ApiErrorResponse(400, '워크스페이스가 최소 한개는 남아있어야 합니다.')
+  async deleteWorkspace(
+    @Request() req: any,
+    @Param('workspaceId') workspaceId: string
+  ) {
+    const userId = req.user.user_id;
+    await this.workspaceService.deleteWorkspace(workspaceId, userId);
+    return '삭제 성공';
   }
 
   @Get('sync')
