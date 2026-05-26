@@ -5,5 +5,12 @@
   "testRegex": ".e2e-spec.ts$",
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
-  }
+  },
+  "moduleNameMapper": {
+    "^src/(.*)$": "<rootDir>/../src/$1",
+    "^multer$": "<rootDir>/../node_modules/.pnpm/multer@2.0.2/node_modules/multer"
+  },
+  "transformIgnorePatterns": [
+    "/node_modules/(?!uuid)"
+  ]
 }

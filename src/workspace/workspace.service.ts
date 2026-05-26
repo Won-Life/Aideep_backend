@@ -110,7 +110,7 @@ export class WorkspaceService {
     return result;
   }
 
-  private async checkExist(userId: string, workspaceId: string) {
+  async checkExist(userId: string, workspaceId: string) {
     const check = await this.workspaceRepository.checkWorkspace(
       userId,
       workspaceId

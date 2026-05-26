@@ -10,7 +10,7 @@ import {
   DeleteObjectCommand
 } from '@aws-sdk/client-s3';
 import { v4 as uuidv4 } from 'uuid';
-import * as path from 'path';
+import { MIME_TO_EXT } from './constant/upload.constant';
 
 export interface UploadedFile {
   key: string;
@@ -48,7 +48,8 @@ export class S3Service {
     file: Express.Multer.File,
     folder: string = 'uploads'
   ): Promise<UploadedFile> {
-    const ext = path.extname(file.originalname);
+
+    const ext = MIME_TO_EXT[file.mimetype];
     const key = `${folder}/${uuidv4()}${ext}`;
 
     try {
@@ -104,6 +105,13 @@ export class S3Service {
   }
 
   /**
+   * S3 key로 공개 URL을 반환합니다.
+   */
+  getPublicUrl(key: string): string {
+    return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}`;
+  }
+
+  /**
    * URL에서 S3 key를 추출합니다.
    */
   extractKeyFromUrl(url: string): string {
@@ -112,9 +120,5 @@ export class S3Service {
       throw new Error(`Invalid S3 URL format: ${url}`);
     }
     return url.slice(bucketUrl.length);
-  }
-
-  private getPublicUrl(key: string): string {
-    return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}`;
   }
 }

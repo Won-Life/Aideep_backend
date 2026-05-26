@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"pnpm exec jest --config test/jest-e2e.json --testPathPatterns=upload --runInBand --no-coverage 2>&1\",\"timeout\":120000,\"description\":\"Run upload e2e spec\"}",
+  "error": "Exit code 1\nFAIL test/upload.e2e-spec.ts\n  ● Test suite failed to run\n\n    Cannot find module 'multer' from '../src/upload/upload.module.ts'\n\n    Require stack:\n      /Users/seoki/workspace/aideep/.worktrees/issue-31/src/upload/upload.module.ts\n      /Users/seoki/workspace/aideep/.worktrees/issue-31/src/app.module.ts\n      upload.e2e-spec.ts\n\n      1 | import { Module } from '@nestjs/common';\n      2 | import { MulterModule } from '@nestjs/platform-express';\n    > 3 | import { memoryStorage } fr...",
+  "timestamp": "2026-05-21T18:32:02.306Z",
+  "retry_count": 1
+}
