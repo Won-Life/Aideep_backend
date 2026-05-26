@@ -2,7 +2,7 @@
 <html lang="ko">
   <head>
     <meta charset="utf-8" />
-    <title>Google 로그인 테스트</title>
+    <title>Google OAuth 테스트 콘솔</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
       :root {
@@ -11,42 +11,70 @@
       body {
         font-family:
           -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        max-width: 560px;
-        margin: 48px auto;
+        max-width: 760px;
+        margin: 32px auto;
         padding: 0 16px;
         line-height: 1.5;
       }
       h1 {
-        margin-bottom: 8px;
+        margin-bottom: 4px;
+      }
+      h3 {
+        margin-top: 28px;
+        padding-bottom: 4px;
+        border-bottom: 1px solid #ddd;
       }
       .muted {
-        color: #666;
-        font-size: 14px;
+        color: #888;
+        font-size: 13px;
       }
       .row {
         display: flex;
         gap: 8px;
         align-items: center;
-        margin: 12px 0;
+        margin: 8px 0;
+        flex-wrap: wrap;
       }
-      input {
+      label {
+        min-width: 130px;
+        color: #666;
+        font-size: 13px;
+      }
+      input[type='text'],
+      input[type='password'],
+      textarea {
         flex: 1;
+        min-width: 240px;
         padding: 8px 10px;
         border: 1px solid #ccc;
         border-radius: 6px;
-        font-size: 14px;
+        font-size: 13px;
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+      }
+      textarea {
+        min-height: 80px;
+        resize: vertical;
+        width: 100%;
       }
       button {
-        padding: 10px 16px;
+        padding: 8px 14px;
         border: 0;
         border-radius: 6px;
         background: #4285f4;
         color: #fff;
-        font-size: 14px;
+        font-size: 13px;
         cursor: pointer;
       }
       button.secondary {
         background: #555;
+      }
+      button.danger {
+        background: #c0392b;
+      }
+      button.ghost {
+        background: transparent;
+        color: #4285f4;
+        border: 1px solid #4285f4;
       }
       pre {
         background: #111;
@@ -55,66 +83,410 @@
         border-radius: 6px;
         overflow: auto;
         font-size: 12px;
-        max-height: 320px;
+        max-height: 280px;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+      .card {
+        border: 1px solid #e5e5e5;
+        border-radius: 8px;
+        padding: 12px 14px;
+        margin: 10px 0;
+        background: rgba(0, 0, 0, 0.02);
+      }
+      .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        background: #eee;
+        color: #444;
+        margin-left: 6px;
       }
     </style>
   </head>
   <body>
-    <h1>Google 로그인 테스트</h1>
+    <h1>Google OAuth 테스트 콘솔</h1>
     <p class="muted">
-      백엔드의 <code>/auth/google</code> 엔드포인트로 이동하여 Google OAuth 흐름을 테스트합니다.
+      AIdeep 백엔드의 Google OAuth 흐름(로그인 · 회원가입 완료 · 연동 · 해제 ·
+      비밀번호 · 세션)을 한 페이지에서 검증합니다.
     </p>
 
-    <div class="row">
-      <label for="base" class="muted" style="width: 80px">Base URL</label>
-      <input id="base" value="http://localhost:3320/v1/aideep/api" />
+    <!-- ── 공통 설정 ────────────────────────────────────────────── -->
+    <h3>0. 공통 설정</h3>
+    <div class="card">
+      <div class="row">
+        <label for="base">Base URL</label>
+        <input id="base" type="text" value="http://localhost:3320/v1/aideep/api" />
+      </div>
+      <div class="row">
+        <label for="accessToken">accessToken</label>
+        <input id="accessToken" type="text" placeholder="로그인/완료 응답으로 자동 채워집니다" />
+      </div>
+      <div class="row">
+        <label for="refreshToken">refreshToken</label>
+        <input id="refreshToken" type="text" placeholder="로그인/완료 응답으로 자동 채워집니다" />
+      </div>
+      <div class="row">
+        <button id="clearTokens" class="secondary">토큰 비우기</button>
+        <span class="muted">값은 localStorage 에 자동 저장됩니다.</span>
+      </div>
     </div>
 
-    <div class="row">
-      <button id="login">Google 로그인 시작</button>
-      <button id="copy" class="secondary" type="button">결과 복사</button>
+    <!-- ── 1. 로그인 개시 ────────────────────────────────────────── -->
+    <h3>1. Google 로그인 / 가입 개시 <span class="badge">public</span></h3>
+    <div class="card">
+      <p class="muted">
+        <code>GET /auth/google</code> 로 이동합니다. Google 인증 후 callback 이
+        JSON 을 반환하므로, 그 JSON 을 아래 “2. 콜백 응답 붙여넣기” 에 붙여넣으면
+        자동으로 토큰/티켓을 추출해 채워줍니다.
+      </p>
+      <div class="row">
+        <button id="loginStart">Google 로그인 시작</button>
+        <button id="linkStartInfo" class="ghost">Google 연동 시작 (안내)</button>
+      </div>
     </div>
 
-    <h3>콜백 응답</h3>
+    <!-- ── 2. 콜백 응답 처리 ────────────────────────────────────── -->
+    <h3>2. 콜백 응답 붙여넣기</h3>
+    <div class="card">
+      <p class="muted">
+        Google 로그인 / 연동 완료 후 백엔드가 보여준 JSON 전체를 그대로 붙여넣고
+        “파싱” 을 누르세요.
+        <br />
+        - <code>kind: "login"</code> → accessToken / refreshToken 자동 채움
+        <br />
+        - <code>kind: "signup_required"</code> → ticket 자동 채움 (아래 3번 사용)
+        <br />
+        - <code>kind: "linked"</code> → 연동 완료 (아래 5번에서 목록 확인)
+      </p>
+      <textarea id="callbackRaw" placeholder='{"kind":"login","accessToken":"...","refreshToken":"..."}'></textarea>
+      <div class="row">
+        <button id="parseCallback">파싱</button>
+      </div>
+    </div>
+
+    <!-- ── 3. OAuth 회원가입 완료 ─────────────────────────────── -->
+    <h3>3. OAuth 회원가입 완료 <span class="badge">public</span></h3>
+    <div class="card">
+      <p class="muted">
+        <code>POST /auth/oauth/signup/complete</code> — signup_required 응답의
+        ticket 으로 회원가입을 마무리합니다.
+      </p>
+      <div class="row">
+        <label for="ticket">ticket</label>
+        <input id="ticket" type="text" placeholder="signup_required 응답의 ticket" />
+      </div>
+      <div class="row">
+        <label for="signupUsername">username</label>
+        <input id="signupUsername" type="text" placeholder="2~100자" />
+      </div>
+      <div class="row">
+        <label for="agreedToTerms">약관 동의</label>
+        <input id="agreedToTerms" type="checkbox" style="flex: 0" checked />
+        <span class="muted">필수: true</span>
+      </div>
+      <div class="row">
+        <button id="completeSignup">회원가입 완료</button>
+      </div>
+    </div>
+
+    <!-- ── 4. 세션 관리 ─────────────────────────────────────────── -->
+    <h3>4. 세션 관리 <span class="badge">accessToken / refreshToken</span></h3>
+    <div class="card">
+      <div class="row">
+        <button id="me">내 정보 조회</button>
+        <button id="refresh">Refresh</button>
+        <button id="logout" class="danger">Logout</button>
+      </div>
+      <p class="muted">
+        내 정보: <code>GET /user/me</code> · Refresh:
+        <code>POST /auth/refresh</code> · Logout:
+        <code>DELETE /auth/logout</code>
+      </p>
+    </div>
+
+    <!-- ── 5. OAuth 연동 관리 ───────────────────────────────────── -->
+    <h3>5. OAuth 연동 관리 <span class="badge">accessToken 필요</span></h3>
+    <div class="card">
+      <p class="muted">
+        목록: <code>GET /auth/oauth/links</code> · 해제:
+        <code>DELETE /auth/oauth/link/:provider</code>
+      </p>
+      <div class="row">
+        <button id="listLinks">연동 목록 조회</button>
+        <label for="unlinkProvider">provider</label>
+        <input id="unlinkProvider" type="text" value="google" style="max-width: 140px" />
+        <button id="unlink" class="danger">연동 해제</button>
+      </div>
+      <details>
+        <summary>Google 연동 시작 (Bearer 필요 + redirect)</summary>
+        <p class="muted">
+          <code>GET /auth/oauth/link/google</code> 는 JwtAuthGuard + 302 redirect
+          이므로 단순 브라우저 네비게이션으로는 Authorization 헤더를 실을 수
+          없습니다. 다음 중 하나로 테스트하세요:
+        </p>
+        <ol class="muted">
+          <li>
+            아래 curl 명령을 복사·실행하고 응답의 <code>Location</code> 헤더(=Google
+            URL) 를 브라우저 주소창에 직접 붙여 넣어 진행합니다.
+          </li>
+          <li>
+            또는 <a id="docsLink" href="#" target="_blank">Swagger /docs</a> 에서
+            “Authorize” 로 accessToken 입력 후
+            <code>/auth/oauth/link/google</code> 의 “Try it out” 실행 → 응답
+            헤더의 Location URL 을 브라우저에서 엽니다.
+          </li>
+        </ol>
+        <textarea id="linkCurl" readonly></textarea>
+        <div class="row">
+          <button id="copyLinkCurl" class="secondary">curl 명령 복사</button>
+        </div>
+      </details>
+    </div>
+
+    <!-- ── 6. 비밀번호 설정/변경 ───────────────────────────────── -->
+    <h3>6. 비밀번호 설정/변경 <span class="badge">accessToken 필요</span></h3>
+    <div class="card">
+      <p class="muted">
+        <code>PATCH /auth/password</code> — 비밀번호 미설정 계정(OAuth 가입자)은
+        currentPassword 생략 가능, 이미 설정된 경우 필수.
+      </p>
+      <div class="row">
+        <label for="currentPassword">currentPassword</label>
+        <input id="currentPassword" type="password" placeholder="(미설정이면 비워둠)" />
+      </div>
+      <div class="row">
+        <label for="newPassword">newPassword</label>
+        <input id="newPassword" type="password" placeholder="최소 4자" />
+      </div>
+      <div class="row">
+        <button id="changePassword">비밀번호 변경</button>
+      </div>
+    </div>
+
+    <!-- ── 결과 출력 ─────────────────────────────────────────── -->
+    <h3>응답</h3>
+    <div class="row">
+      <button id="copyOut" class="secondary">결과 복사</button>
+      <button id="clearOut" class="ghost">결과 지우기</button>
+    </div>
     <pre id="out">아직 응답 없음</pre>
 
     <script>
-      const baseInput = document.getElementById('base');
-      const out = document.getElementById('out');
+      const $ = (id) => document.getElementById(id);
+      const baseInput = $('base');
+      const accessInput = $('accessToken');
+      const refreshInput = $('refreshToken');
+      const ticketInput = $('ticket');
+      const out = $('out');
 
-      const stored = localStorage.getItem('aideep.base');
-      if (stored) baseInput.value = stored;
-      baseInput.addEventListener('change', () => {
-        localStorage.setItem('aideep.base', baseInput.value.trim());
+      // ── 저장/복원 ──
+      const LS = {
+        base: 'aideep.base',
+        access: 'aideep.accessToken',
+        refresh: 'aideep.refreshToken',
+        ticket: 'aideep.ticket'
+      };
+      const restore = (key, el) => {
+        const v = localStorage.getItem(key);
+        if (v) el.value = v;
+      };
+      restore(LS.base, baseInput);
+      restore(LS.access, accessInput);
+      restore(LS.refresh, refreshInput);
+      restore(LS.ticket, ticketInput);
+
+      const bind = (el, key) =>
+        el.addEventListener('input', () =>
+          localStorage.setItem(key, el.value.trim())
+        );
+      bind(baseInput, LS.base);
+      bind(accessInput, LS.access);
+      bind(refreshInput, LS.refresh);
+      bind(ticketInput, LS.ticket);
+
+      // ── 유틸 ──
+      const baseUrl = () => baseInput.value.trim().replace(/\/$/, '');
+      const setOut = (data) => {
+        out.textContent =
+          typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+      };
+      const request = async (method, path, { body, auth } = {}) => {
+        const headers = { 'Content-Type': 'application/json' };
+        if (auth) {
+          const token = accessInput.value.trim();
+          if (!token) {
+            setOut('⚠ accessToken 이 비어있습니다.');
+            return null;
+          }
+          headers.Authorization = `Bearer ${token}`;
+        }
+        try {
+          const res = await fetch(`${baseUrl()}${path}`, {
+            method,
+            headers,
+            body: body ? JSON.stringify(body) : undefined
+          });
+          const text = await res.text();
+          let parsed;
+          try {
+            parsed = JSON.parse(text);
+          } catch {
+            parsed = text;
+          }
+          setOut({ status: res.status, body: parsed });
+          return { status: res.status, body: parsed };
+        } catch (e) {
+          setOut(`fetch 실패: ${e.message}`);
+          return null;
+        }
+      };
+
+      // 응답 envelope 에서 data 추출 (ResponseInterceptor 형식 대응)
+      const unwrap = (body) =>
+        body && typeof body === 'object' && 'data' in body ? body.data : body;
+
+      // ── 1. 로그인 개시 ──
+      $('loginStart').addEventListener('click', () => {
+        window.location.href = `${baseUrl()}/auth/google`;
+      });
+      $('linkStartInfo').addEventListener('click', () => {
+        document.querySelector('#linkCurl').scrollIntoView({ behavior: 'smooth' });
+        const det = document.querySelector('details');
+        if (det) det.open = true;
       });
 
-      document.getElementById('login').addEventListener('click', () => {
-        const base = baseInput.value.trim().replace(/\/$/, '');
-        localStorage.setItem('aideep.base', base);
-        window.location.href = `${base}/auth/google`;
+      // ── 2. 콜백 JSON 파싱 ──
+      $('parseCallback').addEventListener('click', () => {
+        const raw = $('callbackRaw').value.trim();
+        if (!raw) return setOut('붙여넣은 JSON 이 비었습니다.');
+        let json;
+        try {
+          json = JSON.parse(raw);
+        } catch (e) {
+          return setOut(`JSON 파싱 실패: ${e.message}`);
+        }
+        const data = unwrap(json);
+        if (data?.kind === 'login') {
+          accessInput.value = data.accessToken ?? '';
+          refreshInput.value = data.refreshToken ?? '';
+          localStorage.setItem(LS.access, accessInput.value);
+          localStorage.setItem(LS.refresh, refreshInput.value);
+          setOut({ parsed: 'login', tokens: data });
+        } else if (data?.kind === 'signup_required') {
+          ticketInput.value = data.ticket ?? '';
+          localStorage.setItem(LS.ticket, ticketInput.value);
+          setOut({ parsed: 'signup_required', ticket: data.ticket });
+        } else if (data?.kind === 'linked') {
+          setOut({ parsed: 'linked' });
+        } else {
+          setOut({ parsed: 'unknown', original: json });
+        }
       });
 
-      document.getElementById('copy').addEventListener('click', async () => {
+      // ── 3. signup complete ──
+      $('completeSignup').addEventListener('click', async () => {
+        const ticket = ticketInput.value.trim();
+        const username = $('signupUsername').value.trim();
+        const agreedToTerms = $('agreedToTerms').checked;
+        if (!ticket || !username) {
+          return setOut('ticket / username 을 입력하세요.');
+        }
+        const r = await request('POST', '/auth/oauth/signup/complete', {
+          body: { ticket, username, agreedToTerms }
+        });
+        const data = unwrap(r?.body);
+        if (r?.status === 201 && data?.accessToken) {
+          accessInput.value = data.accessToken;
+          refreshInput.value = data.refreshToken ?? '';
+          localStorage.setItem(LS.access, accessInput.value);
+          localStorage.setItem(LS.refresh, refreshInput.value);
+        }
+      });
+
+      // ── 4. 세션 ──
+      $('me').addEventListener('click', () =>
+        request('GET', '/user/me', { auth: true })
+      );
+      $('refresh').addEventListener('click', async () => {
+        const refreshToken = refreshInput.value.trim();
+        if (!refreshToken) return setOut('refreshToken 이 비어있습니다.');
+        const r = await request('POST', '/auth/refresh', {
+          body: { refreshToken }
+        });
+        const data = unwrap(r?.body);
+        if (r?.status === 201 && data?.accessToken) {
+          accessInput.value = data.accessToken;
+          refreshInput.value = data.refreshToken ?? '';
+          localStorage.setItem(LS.access, accessInput.value);
+          localStorage.setItem(LS.refresh, refreshInput.value);
+        }
+      });
+      $('logout').addEventListener('click', () =>
+        request('DELETE', '/auth/logout', { auth: true })
+      );
+
+      // ── 5. 연동 ──
+      $('listLinks').addEventListener('click', () =>
+        request('GET', '/auth/oauth/links', { auth: true })
+      );
+      $('unlink').addEventListener('click', () => {
+        const provider = $('unlinkProvider').value.trim();
+        if (!provider) return setOut('provider 를 입력하세요.');
+        return request('DELETE', `/auth/oauth/link/${provider}`, { auth: true });
+      });
+
+      // ── 5-1. Link curl 생성 ──
+      const refreshLinkCurl = () => {
+        const token = accessInput.value.trim() || '<ACCESS_TOKEN>';
+        $('linkCurl').value =
+          `curl -i -H "Authorization: Bearer ${token}" ` +
+          `"${baseUrl()}/auth/oauth/link/google"`;
+        $('docsLink').href = `${baseUrl().replace(/\/v1\/aideep\/api$/, '')}/docs`;
+      };
+      ['input', 'change'].forEach((ev) => {
+        accessInput.addEventListener(ev, refreshLinkCurl);
+        baseInput.addEventListener(ev, refreshLinkCurl);
+      });
+      refreshLinkCurl();
+      $('copyLinkCurl').addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText($('linkCurl').value);
+          setOut('curl 명령 복사됨');
+        } catch (e) {
+          setOut(`복사 실패: ${e.message}`);
+        }
+      });
+
+      // ── 6. 비밀번호 ──
+      $('changePassword').addEventListener('click', () => {
+        const newPassword = $('newPassword').value;
+        const currentPassword = $('currentPassword').value;
+        if (!newPassword) return setOut('newPassword 를 입력하세요.');
+        const body = { newPassword };
+        if (currentPassword) body.currentPassword = currentPassword;
+        return request('PATCH', '/auth/password', { body, auth: true });
+      });
+
+      // ── 결과 영역 유틸 ──
+      $('copyOut').addEventListener('click', async () => {
         try {
           await navigator.clipboard.writeText(out.textContent || '');
           alert('복사됨');
         } catch (e) {
-          alert('복사 실패: ' + e.message);
+          alert(`복사 실패: ${e.message}`);
         }
       });
-
-      // 콜백이 JSON을 그대로 반환하는 경우 — 이 페이지로 돌아오지 않으므로,
-      // 별도로 콜백 결과를 보고 싶을 때는 백엔드 JSON 페이지에서 토큰을 복사해
-      // 아래 검증용 호출에 사용하세요.
-      // 만약 fetch 모드로 시도하려면 아래 함수를 콘솔에서 호출:
-      window.verifyToken = async (accessToken) => {
-        const base = baseInput.value.trim().replace(/\/$/, '');
-        const res = await fetch(`${base}/user`, {
-          headers: { Authorization: `Bearer ${accessToken}` }
-        });
-        const json = await res.json().catch(() => ({}));
-        out.textContent = JSON.stringify(json, null, 2);
-      };
+      $('clearOut').addEventListener('click', () => setOut('아직 응답 없음'));
+      $('clearTokens').addEventListener('click', () => {
+        accessInput.value = '';
+        refreshInput.value = '';
+        localStorage.removeItem(LS.access);
+        localStorage.removeItem(LS.refresh);
+        refreshLinkCurl();
+        setOut('토큰 비움');
+      });
     </script>
   </body>
 </html>
