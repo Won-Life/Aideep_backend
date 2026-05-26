@@ -19,3 +19,4 @@ export class UploadResponseDto {
   @ApiProperty({ description: '생성 시각' })
   createdAt: Date;
 }
+

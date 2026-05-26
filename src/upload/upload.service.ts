@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
@@ -30,30 +31,33 @@ export class UploadService {
     userId: string
   ): Promise<UploadResponseDto> {
     // A-001: 워크스페이스 멤버십 검증
-    await this.workspaceService.checkExist(userId, workspaceId);
+    const check = await this.workspaceService.checkExist(userId, workspaceId);
+    if(check.role === "VIEWER")
+      throw new BadRequestException("파일 업로드 권한이 존재하지 않습니다.")
 
     // A-003: S3 업로드 후 DB 실패 시 보상 삭제
+
     const uploaded = await this.s3Service.uploadFile(file);
-
-    const upload = await this.uploadRepository.uploadFile(
-      uploaded,
-      userId,
-      workspaceId
-    );
-
-    if (!upload) {
-      await this.s3Service.deleteFile(uploaded.key);
-      throw new InternalServerErrorException('파일 업로드에 실패했습니다.');
+    try {
+      const upload = await this.uploadRepository.uploadFile(
+        uploaded,
+        userId,
+        workspaceId
+      );
+      return {
+        fileId: upload.file_id,
+        fileUrl: upload.file_url,
+        mimeType: upload.mime_type,
+        size: upload.size,
+        originalName: uploaded.originalName,
+        createdAt: upload.created_at
+      };
+    } catch (e) {
+      await this.s3Service.deleteFile(uploaded.key).catch(() => {
+        this.logger.error(`보상 삭제 실패: ${uploaded.key}`);
+      });
+      throw e;
     }
-
-    return {
-      fileId: upload.file_id,
-      fileUrl: upload.file_url,
-      mimeType: upload.mime_type,
-      size: upload.size,
-      originalName: uploaded.originalName,
-      createdAt: upload.created_at
-    };
   }
 
   // async uploadMany(

@@ -24,6 +24,7 @@ import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE } from './constant/upload.constant';
 import { UploadManyResponseDto } from './dto/upload-many-response.dto';
 import { UploadResponseDto } from './dto/upload-response.dto';
 import { UploadService } from './upload.service';
+import { UploadRequestDto } from './dto/uploade-request.dto';
 
 const MULTER_OPTIONS = {
   storage: memoryStorage(),
@@ -58,7 +59,7 @@ export class UploadController {
   @UseInterceptors(FileInterceptor('file', MULTER_OPTIONS))
   async uploadOne(
     @UploadedFile() file: Express.Multer.File,
-    @Body('workspaceId') workspaceId: string,
+    @Body() body : UploadRequestDto,
     @Request() req: any
   ) {
     if (!file) {
@@ -69,11 +70,8 @@ export class UploadController {
         `허용된 MIME 타입이 아닙니다. 허용: ${ALLOWED_MIME_TYPES.join(', ')}`
       );
     }
-    if (!workspaceId) {
-      throw new BadRequestException('workspaceId가 필요합니다.');
-    }
     const userId = req.user?.user_id;
-    return this.uploadService.uploadOne(file, workspaceId, userId);
+    return this.uploadService.uploadOne(file, body.workspaceId, userId);
   }
 
   // @Post('many')

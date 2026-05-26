@@ -4,7 +4,6 @@ import { memoryStorage } from 'multer';
 import { S3Service } from './s3.service';
 import { UploadController } from './upload.controller';
 import { UploadService } from './upload.service';
-import { WorkspaceService } from 'src/workspace/workspace.service';
 import { UploadRepository } from './upload.repository';
 import { WorkspaceModule } from 'src/workspace/workspace.module';
 

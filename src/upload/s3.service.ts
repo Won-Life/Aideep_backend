@@ -10,7 +10,7 @@ import {
   DeleteObjectCommand
 } from '@aws-sdk/client-s3';
 import { v4 as uuidv4 } from 'uuid';
-import * as path from 'path';
+import { MIME_TO_EXT } from './constant/upload.constant';
 
 export interface UploadedFile {
   key: string;
@@ -48,7 +48,8 @@ export class S3Service {
     file: Express.Multer.File,
     folder: string = 'uploads'
   ): Promise<UploadedFile> {
-    const ext = path.extname(file.originalname);
+
+    const ext = MIME_TO_EXT[file.mimetype];
     const key = `${folder}/${uuidv4()}${ext}`;
 
     try {
