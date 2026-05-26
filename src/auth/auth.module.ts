@@ -7,6 +7,8 @@ import { LocalStrategy } from './strategy/local.strategy';
 import { JwtAuthGuard } from './guards/jwt.guard';
 import { JwtModule } from '@nestjs/jwt';
 import { JwtStrategy } from './strategy/jwt.strategy';
+import { GoogleStrategy } from './strategy/google.strategy';
+import { OAuthAccountRepository } from './oauth/oauth-account.repository';
 
 @Module({
   imports: [
@@ -21,7 +23,7 @@ import { JwtStrategy } from './strategy/jwt.strategy';
     })
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtAuthGuard, LocalStrategy, JwtStrategy],
+  providers: [AuthService, JwtAuthGuard, LocalStrategy, JwtStrategy, GoogleStrategy, OAuthAccountRepository],
   exports: [JwtAuthGuard, JwtModule]
 })
 export class AuthModule {}
