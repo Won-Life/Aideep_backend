@@ -1,4 +1,6 @@
+import * as crypto from 'crypto';
 import {
+  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -18,11 +20,17 @@ import { RedisService } from 'src/redis/redis.service';
 import { REDIS_KEYS } from 'src/redis/redis.keys';
 import { VerifyEmailRequestBody } from './dtos/verifyEmail.dto';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston/dist/winston.constants';
+import { GoogleProfile } from './strategy/google.strategy';
+import { OAuthAccountRepository } from './oauth/oauth-account.repository';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { Prisma } from 'src/generated/prisma/client';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly userRepository: UserRepository,
+    private readonly oauthAccountRepository: OAuthAccountRepository,
+    private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly redisService: RedisService,
     @Inject(WINSTON_MODULE_NEST_PROVIDER) private readonly logger: LoggerService
@@ -33,7 +41,7 @@ export class AuthService {
     if (user === null)
       throw new UnauthorizedException('존재하지 않는 아이디 입니다');
 
-    const hashed = await bcrypt.compare(password, user.password);
+    const hashed = await bcrypt.compare(password, user.password ?? '');
     if (!hashed)
       throw new UnauthorizedException('비밀번호가 일치하지 않습니다.');
 
@@ -172,13 +180,14 @@ export class AuthService {
 
       await this.redisService.getClient().set(authKey, authData, { EX: 180 });
 
-      await transporter.sendMail(mailOptions, (err, res) => {
+      await transporter.sendMail(mailOptions, (err) => {
         if (err) {
           transporter.close();
           throw new NotFoundException(err);
         }
       });
-      return { code: authCode };
+      // D-011: authCode를 응답에서 제거
+      return { ok: true };
     } catch (err) {
       console.log(err);
     }
@@ -230,5 +239,280 @@ export class AuthService {
 
     await redis.del(verified);
     await this.userRepository.create(dto);
+  }
+
+  // ─── Google OAuth 메인 흐름 (D-001, D-002, D-004, D-009 보완) ───────────────
+
+  async handleGoogleLogin(profile: GoogleProfile) {
+    const redis = this.redisService.getClient();
+
+    // State 는 모든 흐름에서 필수 (login-CSRF 방지 — D-009 보완)
+    if (!profile.state) {
+      throw new UnauthorizedException('state 누락');
+    }
+
+    const raw = await redis.getDel(REDIS_KEYS.OAUTH_LINK_NONCE(profile.state));
+    if (!raw) {
+      throw new UnauthorizedException('유효하지 않은 state');
+    }
+
+    const data = JSON.parse(raw) as {
+      mode: 'login' | 'link';
+      user_id?: string;
+    };
+
+    // ── Link 흐름 ──────────────────────────────────────────────────────────
+    if (data.mode === 'link') {
+      const user_id = data.user_id!;
+
+      // 다른 사용자가 동일 provider_user_id 를 이미 사용 중인지 확인
+      const existingAccount =
+        await this.oauthAccountRepository.findByProviderSubject(
+          'google',
+          profile.id
+        );
+      if (existingAccount && existingAccount.user_id !== user_id) {
+        throw new ConflictException(
+          '이미 다른 계정에 연동된 Google 계정입니다.'
+        );
+      }
+
+      // 이미 연동된 경우
+      const alreadyLinked =
+        await this.oauthAccountRepository.findByUserAndProvider(
+          user_id,
+          'google'
+        );
+      if (alreadyLinked) {
+        throw new ConflictException('이미 연동된 제공자입니다.');
+      }
+
+      await this.oauthAccountRepository.createForUser(
+        user_id,
+        'google',
+        profile.id,
+        profile.email
+      );
+      return { kind: 'linked' as const };
+    }
+
+    // ── Login / Signup 흐름 (mode === 'login') ────────────────────────────
+    const oauthAccount =
+      await this.oauthAccountRepository.findByProviderSubject(
+        'google',
+        profile.id
+      );
+    if (oauthAccount) {
+      const user = await this.userRepository.findByUserId(
+        oauthAccount.user_id
+      );
+      if (!user) throw new UnauthorizedException('사용자를 찾을 수 없습니다.');
+      const jwtPayload: JwtPayload = {
+        userName: user.username,
+        email: user.email,
+        user_id: user.user_id
+      };
+      const tokens = await this.login(jwtPayload);
+      return { kind: 'login' as const, ...tokens };
+    }
+
+    // 신규 사용자: 이메일 충돌 검사 (D-002, D-012)
+    const existingByEmail = await this.userRepository.findByEmail(
+      profile.email
+    );
+    if (existingByEmail) {
+      // enumeration 완화: generic 메시지 + 200~300ms 인위 지연
+      await new Promise((resolve) =>
+        setTimeout(resolve, 200 + Math.random() * 100)
+      );
+      throw new ConflictException(
+        '이미 가입된 이메일입니다. 이메일/비밀번호 로그인 후 계정을 연동하세요.'
+      );
+    }
+
+    // Signup ticket 발급 (D-001, D-013)
+    const ticket = crypto.randomBytes(32).toString('base64url');
+    const ticketPayload = JSON.stringify({
+      provider: 'google',
+      providerUserId: profile.id,
+      email: profile.email,
+      displayName: profile.displayName
+    });
+    await redis.set(REDIS_KEYS.OAUTH_SIGNUP_TICKET(ticket), ticketPayload, {
+      EX: 300,
+      NX: true
+    });
+
+    return { kind: 'signup_required' as const, ticket };
+  }
+
+  // ─── OAuth 회원가입 complete (D-001, D-008) ────────────────────────────────
+
+  async completeOAuthSignup(dto: {
+    ticket: string;
+    username: string;
+    agreedToTerms: boolean;
+  }) {
+    const redis = this.redisService.getClient();
+    const raw = await redis.getDel(REDIS_KEYS.OAUTH_SIGNUP_TICKET(dto.ticket));
+    if (!raw)
+      throw new UnauthorizedException(
+        '유효하지 않거나 만료된 ticket 입니다.'
+      );
+
+    const ticketData = JSON.parse(raw) as {
+      provider: string;
+      providerUserId: string;
+      email: string;
+      displayName: string;
+    };
+
+    try {
+      let createdUser: { user_id: string; username: string; email: string };
+
+      await this.prisma.runInTransaction(async () => {
+        createdUser = await this.prisma.client.users.create({
+          data: {
+            email: ticketData.email,
+            username: dto.username,
+            password: null
+          }
+        });
+        await this.prisma.client.oauth_accounts.create({
+          data: {
+            user_id: createdUser!.user_id,
+            provider: ticketData.provider,
+            provider_user_id: ticketData.providerUserId,
+            email: ticketData.email
+          }
+        });
+      });
+
+      const jwtPayload: JwtPayload = {
+        userName: createdUser!.username,
+        email: createdUser!.email,
+        user_id: createdUser!.user_id
+      };
+      return this.login(jwtPayload);
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          '이미 가입된 이메일 또는 OAuth 계정입니다.'
+        );
+      }
+      throw err;
+    }
+  }
+
+  // ─── 공용 Google authorize URL 생성 헬퍼 ─────────────────────────────────
+
+  private buildGoogleAuthUrl(nonce: string): string {
+    const params = new URLSearchParams({
+      client_id: process.env.GOOGLE_CLIENT_ID as string,
+      redirect_uri: process.env.GOOGLE_CALLBACK_URL as string,
+      response_type: 'code',
+      scope: 'email profile',
+      state: nonce,
+      access_type: 'offline',
+      prompt: 'consent'
+    });
+    return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+  }
+
+  // ─── OAuth Login 개시 — login mode nonce (D-009 보완) ──────────────────────
+
+  async initiateOAuthLogin(): Promise<string> {
+    const nonce = crypto.randomBytes(16).toString('base64url');
+    await this.redisService.getClient().set(
+      REDIS_KEYS.OAUTH_LINK_NONCE(nonce),
+      JSON.stringify({ mode: 'login' }),
+      { EX: 300, NX: true }
+    );
+    return this.buildGoogleAuthUrl(nonce);
+  }
+
+  // ─── OAuth Link 개시 — link mode nonce (D-004, D-014) ─────────────────────
+
+  async initiateOAuthLink(userId: string): Promise<string> {
+    const nonce = crypto.randomBytes(16).toString('base64url');
+    await this.redisService.getClient().set(
+      REDIS_KEYS.OAUTH_LINK_NONCE(nonce),
+      JSON.stringify({ mode: 'link', user_id: userId }),
+      { EX: 300, NX: true }
+    );
+    return this.buildGoogleAuthUrl(nonce);
+  }
+
+  // ─── OAuth 연동 목록 (D-016) ────────────────────────────────────────────────
+
+  async listOAuthLinks(userId: string) {
+    return this.oauthAccountRepository.listActiveByUser(userId);
+  }
+
+  // ─── Unlink (D-005) — $transaction + SELECT FOR UPDATE + LAST_AUTH_METHOD ──
+
+  async unlinkOAuth(userId: string, provider: string) {
+    await this.prisma.runInTransaction(async () => {
+      const user = await this.prisma.client.users.findUnique({
+        where: { user_id: userId },
+        select: { password: true }
+      });
+
+      const rows = await (
+        this.prisma.client as unknown as {
+          $queryRaw: <T>(query: TemplateStringsArray, ...values: unknown[]) => Promise<T>;
+        }
+      ).$queryRaw<{ count: bigint }[]>`
+        SELECT COUNT(*) AS count FROM oauth_accounts
+        WHERE user_id = ${userId}::uuid AND deleted_at IS NULL
+        FOR UPDATE
+      `;
+      const remaining = rows[0].count - BigInt(1);
+
+      if (user?.password === null && remaining < BigInt(1)) {
+        throw new ConflictException('LAST_AUTH_METHOD');
+      }
+
+      const r = await this.prisma.client.oauth_accounts.updateMany({
+        where: { user_id: userId, provider, deleted_at: null },
+        data: { deleted_at: new Date() }
+      });
+
+      if (r.count === 0) throw new NotFoundException('NOT_LINKED');
+    });
+  }
+
+  // ─── 비밀번호 설정/변경 (D-007) ────────────────────────────────────────────
+
+  async changePassword(
+    userId: string,
+    dto: { currentPassword?: string; newPassword: string }
+  ) {
+    const user = await this.prisma.client.users.findUnique({
+      where: { user_id: userId },
+      select: { password: true }
+    });
+
+    if (!user) throw new UnauthorizedException('사용자를 찾을 수 없습니다.');
+
+    if (user.password !== null) {
+      if (!dto.currentPassword) {
+        throw new UnauthorizedException('현재 비밀번호를 입력해주세요.');
+      }
+      const valid = await bcrypt.compare(dto.currentPassword, user.password);
+      if (!valid)
+        throw new UnauthorizedException('현재 비밀번호가 일치하지 않습니다.');
+    }
+
+    const hashed = await bcrypt.hash(dto.newPassword, 10);
+    await this.prisma.client.users.update({
+      where: { user_id: userId },
+      data: { password: hashed }
+    });
+
+    return '비밀번호가 설정되었습니다.';
   }
 }
