@@ -79,8 +79,15 @@ export class WsGateway
 
     try {
       const payload = this.jwtService.verify(token);
-      client.data.userId = payload.user_id;
-      client.join(userRoom(payload.user_id));
+      const userId =
+        payload && typeof payload.user_id === 'string' ? payload.user_id : null;
+
+      if (!userId) {
+        client.disconnect();
+        return;
+      }
+      client.data.userId = userId;
+      client.join(userRoom(userId));
       this.wsMetrics.increment();
     } catch (err) {
       client.disconnect();
