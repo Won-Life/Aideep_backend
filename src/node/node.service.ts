@@ -22,8 +22,15 @@ import {
 } from 'src/ws/ws.event';
 import { RedisService } from 'src/redis/redis.service';
 import { REDIS_KEYS } from 'src/redis/redis.keys';
-import { NodeMoveBody, UpdateNodeMetaBody } from './dto/updateNode.dto';
+import {
+  NodeMoveBody,
+  NodeMoveResponse,
+  NodeUpdateResponse,
+  NodeDescendantUpdate,
+  UpdateNodeMetaBody
+} from './dto/updateNode.dto';
 import { Transactional } from 'src/prisma/transactional.decorator';
+import { NodeCreateReponse } from './dto/createNode.dto';
 
 @Injectable()
 export class NodeService {
@@ -51,7 +58,7 @@ export class NodeService {
     }
   }
 
-  async createProjectNode(node: Node): Promise<string> {
+  async createProjectNode(node: Node): Promise<NodeCreateReponse> {
     await this.checkEditPermission(node.userId, node.workspaceId);
     const ans = await this.nodeRespository.insertNode(node);
 
@@ -59,24 +66,26 @@ export class NodeService {
       .getClient()
       .del(REDIS_KEYS.WORKSPACE_SYNC(node.workspaceId));
 
+    const nodeAns = {
+      nodeId: ans.node_id,
+      title: ans.title,
+      nodeType: ans.node_type,
+      position: { x: ans.position_x ?? 0, y: ans.position_y ?? 0 },
+      data: ans.content as Record<string, unknown>,
+      createdAt: ans.created_at.toDateString()
+    };
+
     this.wsGateway.broadcast({
       type: 'NODE_CREATE',
       workspaceId: ans.workspace_id,
       userId: node.userId,
-      node: {
-        nodeId: ans.node_id,
-        title: ans.title,
-        nodeType: ans.node_type,
-        position: { x: ans.position_x, y: ans.position_y },
-        data: ans.content as Record<string, unknown>,
-        createdAt: ans.created_at.toDateString()
-      }
+      node: nodeAns
     } as NodeCreateEvent);
 
-    return ans.node_id;
+    return nodeAns;
   }
 
-  async createMarkdownNode(node: Node): Promise<string> {
+  async createMarkdownNode(node: Node): Promise<NodeCreateReponse> {
     await this.checkEditPermission(node.userId, node.workspaceId);
     const ans = await this.nodeRespository.insertNode(node);
 
@@ -84,21 +93,23 @@ export class NodeService {
       .getClient()
       .del(REDIS_KEYS.WORKSPACE_SYNC(node.workspaceId));
 
+    const nodeAns = {
+      nodeId: ans.node_id,
+      title: ans.title,
+      nodeType: ans.node_type,
+      position: { x: ans.position_x ?? 0, y: ans.position_y ?? 0 },
+      data: ans.content as Record<string, unknown>,
+      createdAt: ans.created_at.toDateString()
+    };
+
     this.wsGateway.broadcast({
       type: 'NODE_CREATE',
       workspaceId: ans.workspace_id,
       userId: node.userId,
-      node: {
-        nodeId: ans.node_id,
-        title: ans.title,
-        nodeType: ans.node_type,
-        position: { x: ans.position_x, y: ans.position_y },
-        data: ans.content as Record<string, unknown>,
-        createdAt: ans.created_at.toDateString()
-      }
+      node: nodeAns
     } as NodeCreateEvent);
 
-    return ans.node_id;
+    return nodeAns;
   }
 
   // async createPdfNode(node: Node) {
@@ -157,7 +168,7 @@ export class NodeService {
     userId: string,
     workspaceId: string,
     nodeId: string
-  ) {
+  ): Promise<NodeMoveResponse> {
     const { x, y } = body.position;
     await this.checkEditPermission(userId, workspaceId);
 
@@ -201,6 +212,8 @@ export class NodeService {
       x: x,
       y: y
     } as NodeMoveEvent);
+
+    return { nodeId, x, y };
   }
 
   //TODO: 로직 수정
@@ -209,7 +222,7 @@ export class NodeService {
     nodeId: string,
     workspaceId: string,
     body: UpdateNodeMetaBody
-  ) {
+  ): Promise<NodeUpdateResponse> {
     const { title, color, textColor, propagateToChildren } = body;
     await this.checkEditPermission(userId, workspaceId);
 
@@ -249,6 +262,7 @@ export class NodeService {
     });
 
     // 자식 노드 색상 전파
+    const descendantUpdates: NodeDescendantUpdate[] = [];
     if (
       propagateToChildren &&
       (color !== undefined || textColor !== undefined)
@@ -287,9 +301,19 @@ export class NodeService {
             userId,
             patch: { data: descUpdatedContent }
           });
+
+          descendantUpdates.push({
+            nodeId: descendant.node_id,
+            patch: { data: descUpdatedContent }
+          });
         }
       }
     }
+
+    return {
+      nodeId: existing.node_id,
+      patch
+    };
   }
 
   private async checkExist(userId: string, workspaceId: string) {

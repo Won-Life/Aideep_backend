@@ -8,6 +8,7 @@ import { EdgeService } from './edge.service';
 import { EdgeRepository } from './edge.repository';
 import { WorkspaceRepository } from 'src/workspace/workspace.repository';
 import { NodeRepository } from 'src/node/node.repository';
+import { NodeService } from 'src/node/node.service';
 import { Edge } from './edge.model';
 import { WsGateway } from 'src/ws/ws.gateway';
 import { RedisService } from 'src/redis/redis.service';
@@ -60,6 +61,12 @@ describe('EdgeService', () => {
           provide: NodeRepository,
           useValue: {
             selectNodeById: jest.fn()
+          }
+        },
+        {
+          provide: NodeService,
+          useValue: {
+            propagateDepth: jest.fn().mockResolvedValue(undefined)
           }
         },
         {
@@ -232,9 +239,9 @@ describe('EdgeService', () => {
             sourceId: dto.sourceId,
             targetId: dto.targetId,
             sourceHandle: dto.sourceHandle,
-            targetHandle: dto.targetHandle,
-          }),
-        }),
+            targetHandle: dto.targetHandle
+          })
+        })
       );
     });
 

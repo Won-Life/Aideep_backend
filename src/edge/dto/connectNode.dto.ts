@@ -18,3 +18,16 @@ export class ConnectNodeDto {
   @IsString()
   sourceHandle: string;
 }
+
+export class EdgeCreateResponse {
+  @ApiProperty({ example: 'c8c9ea51-6ef6-46aa-849d-9b086855a39e' })
+  edgeId: string;
+  @ApiProperty({ example: 'c8c9ea51-6ef6-46aa-849d-9b086855a39e' })
+  sourceId: string;
+  @ApiProperty({ example: 'c8c9ea51-6ef6-46aa-849d-9b086855a39e' })
+  targetId: string;
+  @ApiProperty({ example: 'test' })
+  sourceHandle: string;
+  @ApiProperty({ example: 'test' })
+  targetHandle: string;
+}

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NodeService } from './node.service';
 import { NodeRepository } from './node.repository';
 import { WorkspaceRepository } from '../workspace/workspace.repository';
+import { EdgeRepository } from '../edge/edge.repository';
 import { WsGateway } from '../ws/ws.gateway';
 import { RedisService } from '../redis/redis.service';
 
@@ -20,34 +21,40 @@ const mockInsertResult = {
   created_at: new Date('2026-01-01'),
   updated_at: new Date('2026-01-01'),
   deleted_at: null,
-  version: 1,
+  version: 1
 };
 
 describe('NodeService', () => {
   let service: NodeService;
   let nodeRepository: { [K: string]: jest.Mock };
   let workspaceRepository: { [K: string]: jest.Mock };
+  let edgeRepository: { [K: string]: jest.Mock };
   let wsGateway: { broadcast: jest.Mock };
 
   const mockRedisClient = {
     get: jest.fn(),
     set: jest.fn(),
-    del: jest.fn(),
+    del: jest.fn()
   };
 
   beforeEach(async () => {
     nodeRepository = {
       insertNode: jest.fn(),
       selectNodeById: jest.fn(),
+      selectNodesByIds: jest.fn(),
       selectAllNode: jest.fn(),
       selectAllEdge: jest.fn(),
       selectAllDescendantIds: jest.fn(),
       updateNode: jest.fn(),
       updateNodePositionDelta: jest.fn(),
+      deleteNode: jest.fn()
     };
     workspaceRepository = {
       checkWorkspace: jest.fn(),
-      selectUserWorkspace: jest.fn(),
+      selectUserWorkspace: jest.fn()
+    };
+    edgeRepository = {
+      deleteEdgesByNodeId: jest.fn()
     };
     wsGateway = { broadcast: jest.fn() };
 
@@ -56,12 +63,13 @@ describe('NodeService', () => {
         NodeService,
         { provide: NodeRepository, useValue: nodeRepository },
         { provide: WorkspaceRepository, useValue: workspaceRepository },
+        { provide: EdgeRepository, useValue: edgeRepository },
         { provide: WsGateway, useValue: wsGateway },
         {
           provide: RedisService,
-          useValue: { getClient: jest.fn().mockReturnValue(mockRedisClient) },
-        },
-      ],
+          useValue: { getClient: jest.fn().mockReturnValue(mockRedisClient) }
+        }
+      ]
     }).compile();
 
     service = module.get<NodeService>(NodeService);
@@ -80,7 +88,11 @@ describe('NodeService', () => {
       title: 'Test Node',
       nodeType: 'PROJECT' as const,
       position: { x: 100, y: 200 },
-      data: { dataType: 'PROJECT' as const, color: '#ffffff', textColor: '#000000' },
+      data: {
+        dataType: 'PROJECT' as const,
+        color: '#ffffff',
+        textColor: '#000000'
+      }
     };
 
     beforeEach(() => {
@@ -88,11 +100,17 @@ describe('NodeService', () => {
       nodeRepository.insertNode.mockResolvedValue(mockInsertResult);
     });
 
-    it('should return the created node_id as a string', async () => {
+    it('should return the created node payload', async () => {
       const result = await service.createProjectNode(projectNode as any);
 
-      expect(typeof result).toBe('string');
-      expect(result).toBe(MOCK_NODE_ID);
+      expect(result).toEqual(
+        expect.objectContaining({
+          nodeId: MOCK_NODE_ID,
+          title: 'Test Node',
+          nodeType: 'PROJECT',
+          position: { x: 100, y: 200 }
+        })
+      );
     });
 
     it('should broadcast NODE_CREATE event via WsGateway', async () => {
@@ -104,8 +122,8 @@ describe('NodeService', () => {
           type: 'NODE_CREATE',
           workspaceId: MOCK_WORKSPACE_ID,
           userId: MOCK_USER_ID,
-          node: expect.objectContaining({ nodeId: MOCK_NODE_ID }),
-        }),
+          node: expect.objectContaining({ nodeId: MOCK_NODE_ID })
+        })
       );
     });
 
@@ -125,8 +143,8 @@ describe('NodeService', () => {
         markdownBody: '# Hello',
         jsonBody: '{}',
         color: '#ffffff',
-        textColor: '#000000',
-      },
+        textColor: '#000000'
+      }
     };
 
     const mdNode = {
@@ -140,8 +158,8 @@ describe('NodeService', () => {
         markdownBody: '# Hello',
         jsonBody: '{}',
         color: '#ffffff',
-        textColor: '#000000',
-      },
+        textColor: '#000000'
+      }
     };
 
     beforeEach(() => {
@@ -149,11 +167,15 @@ describe('NodeService', () => {
       nodeRepository.insertNode.mockResolvedValue(mdInsertResult);
     });
 
-    it('should return the created node_id as a string', async () => {
+    it('should return the created node payload', async () => {
       const result = await service.createMarkdownNode(mdNode as any);
 
-      expect(typeof result).toBe('string');
-      expect(result).toBe(MOCK_NODE_ID);
+      expect(result).toEqual(
+        expect.objectContaining({
+          nodeId: MOCK_NODE_ID,
+          nodeType: 'DATA'
+        })
+      );
     });
 
     it('should broadcast NODE_CREATE event via WsGateway', async () => {
@@ -164,8 +186,8 @@ describe('NodeService', () => {
         expect.objectContaining({
           type: 'NODE_CREATE',
           workspaceId: MOCK_WORKSPACE_ID,
-          userId: MOCK_USER_ID,
-        }),
+          userId: MOCK_USER_ID
+        })
       );
     });
   });

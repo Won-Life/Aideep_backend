@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '../generated/prisma/client';
+import { Prisma, nodes } from '../generated/prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Node } from './node.model';
 import { tree } from 'lib0';
@@ -33,6 +33,19 @@ export type RawNodeItem = Prisma.nodesGetPayload<{
     position_y: true;
     workspace_id: true;
     depth: true;
+  };
+}>;
+
+export type CreatNodeItem = Prisma.nodesGetPayload<{
+  select: {
+    node_id: true;
+    workspace_id : true
+    title: true;
+    node_type: true;
+    position_x: true;
+    position_y: true;
+    content: true;
+    created_at: true;
   };
 }>;
 
@@ -137,7 +150,7 @@ export class NodeRepository {
     });
   }
 
-  async insertNode(node: Node) {
+  async insertNode(node: Node): Promise<CreatNodeItem> {
     return await this.prisma.client.nodes.create({
       data: {
         title: node.title,
@@ -147,6 +160,16 @@ export class NodeRepository {
         workspace_id: node.workspaceId,
         depth: node.depth,
         content: node.data as unknown as Prisma.InputJsonValue
+      },
+      select: {
+        node_id: true,
+        workspace_id : true,
+        title: true,
+        node_type: true,
+        position_x: true,
+        position_y: true,
+        content: true,
+        created_at: true
       }
     });
   }

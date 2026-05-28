@@ -47,3 +47,38 @@ export class NodeMoveBody {
   @Type(() => PositionDto)
   position: PositionDto;
 }
+
+export class NodeMoveResponse {
+  @ApiProperty()
+  nodeId: string;
+
+  @ApiProperty({ example: 100 })
+  x: number;
+
+  @ApiProperty({ example: 200 })
+  y: number;
+}
+
+export class NodeUpdatePatch {
+  @ApiProperty({ required: false })
+  title?: string;
+
+  @ApiProperty({ required: false, type: Object })
+  data?: Record<string, unknown>;
+}
+
+export class NodeDescendantUpdate {
+  @ApiProperty()
+  nodeId: string;
+
+  @ApiProperty({ type: NodeUpdatePatch })
+  patch: NodeUpdatePatch;
+}
+
+export class NodeUpdateResponse {
+  @ApiProperty()
+  nodeId: string;
+
+  @ApiProperty({ type: NodeUpdatePatch })
+  patch: NodeUpdatePatch;
+}
