@@ -424,6 +424,7 @@ export class NodeService {
       workspaceId,
       nodeId
     );
+
     if (!existing) throw new NotFoundException('노드를 찾을 수 없습니다.');
 
     await this.edgeRepository.deleteEdgesByNodeId(nodeId);
@@ -435,6 +436,7 @@ export class NodeService {
     this.wsGateway.broadcast({
       type: 'NODE_DELETE',
       workspaceId: workspaceId,
+      userId: userId,
       nodeId: nodeId
     } as NodeDeleteEvent);
     return '노드 삭제';
