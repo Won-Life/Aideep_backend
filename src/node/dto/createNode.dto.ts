@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsNumber, IsString, IsUrl, ValidateNested } from 'class-validator';
-import { node_type_enum } from '@prisma/client';
+import { node_type_enum } from '../../generated/prisma/client';
 
 export class MarkDownBody {
   @IsString()
