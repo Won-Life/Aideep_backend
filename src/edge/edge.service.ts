@@ -13,9 +13,11 @@ import { NodeRepository } from 'src/node/node.repository';
 import { NodeService } from 'src/node/node.service';
 import { WsGateway } from 'src/ws/ws.gateway';
 import { EdgeCreateEvent } from 'src/ws/ws.event';
+import { EdgeCreateResponse } from './dto/connectNode.dto';
 import { RedisService } from 'src/redis/redis.service';
 import { REDIS_KEYS } from 'src/redis/redis.keys';
 import { useContainer } from 'class-validator';
+import { DeleteEdgeResponse } from './dto/deleteEdge.dto';
 
 @Injectable()
 export class EdgeService {
@@ -69,7 +71,7 @@ export class EdgeService {
   }
 
   @Transactional()
-  async connectNodes(dto: Edge) {
+  async connectNodes(dto: Edge): Promise<EdgeCreateResponse> {
     await this.checkEditPermission(dto.userId, dto.workspaceId);
 
     if (dto.sourceId === dto.targetId)
@@ -106,17 +108,6 @@ export class EdgeService {
     if (reverseEdge)
       throw new BadRequestException('역방향 엣지가 이미 존재합니다.');
 
-    //Target노드가 부모 노드임
-
-    // source 노드의 outgoing 엣지 중복 여부 (source는 하나의 엣지만 허용)
-    // const sourceOutgoing = await this.edgeRepository.findEdgesBySource(
-    //   dto.sourceId
-    // );
-    // if (sourceOutgoing.length > 0)
-    //   throw new BadRequestException(
-    //     '해당 노드는 이미 다른 노드와 연결되어 있습니다.'
-    //   );
-
     // 사이클 검출: target에서 BFS로 source 도달 가능 여부
     const allEdges = await this.edgeRepository.findAllEdgesInWorkspace(
       dto.workspaceId
@@ -149,10 +140,20 @@ export class EdgeService {
       }
     } as EdgeCreateEvent);
 
-    return { edgeId: result.edge_id };
+    return {
+      edgeId: result.edge_id,
+      sourceId: dto.sourceId,
+      targetId: dto.targetId,
+      sourceHandle: dto.sourceHandle,
+      targetHandle: dto.targetHandle
+    };
   }
 
-  async deleteEdge(workspaceId: string, userId: string, edgeId: string) {
+  async deleteEdge(
+    workspaceId: string,
+    userId: string,
+    edgeId: string
+  ): Promise<DeleteEdgeResponse> {
     await this.checkEditPermission(userId, workspaceId);
 
     const isExist = await this.edgeRepository.findEdgeById(edgeId);
@@ -182,6 +183,8 @@ export class EdgeService {
       userId: userId,
       edgeId: edgeId
     });
-    return '엣지 삭제';
+    return {
+      edgeId: edgeId
+    };
   }
 }

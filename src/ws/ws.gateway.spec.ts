@@ -70,6 +70,7 @@ describe('WsGateway', () => {
     // Inject a mock Server
     gateway.server = {
       to: jest.fn().mockReturnThis(),
+      except: jest.fn().mockReturnThis(),
       emit: jest.fn()
     } as unknown as Server;
   });
@@ -97,6 +98,7 @@ describe('WsGateway', () => {
       const client = {
         handshake: { auth: { token: 'valid-token' }, query: {} },
         disconnect: jest.fn(),
+        join: jest.fn(),
         data: {}
       } as unknown as Socket;
 
@@ -128,6 +130,7 @@ describe('WsGateway', () => {
       const client = {
         handshake: { auth: {}, query: { token: 'query-token' } },
         disconnect: jest.fn(),
+        join: jest.fn(),
         data: {}
       } as unknown as Socket;
 

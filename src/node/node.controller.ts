@@ -23,9 +23,15 @@ import {
 import { JwtAuthGuard } from 'src/auth/guards/jwt.guard';
 import {
   CreateMarkDownNodeBody,
-  CreateProjectNodeBody
+  CreateProjectNodeBody,
+  NodeCreateReponse
 } from './dto/createNode.dto';
-import { NodeMoveBody, UpdateNodeMetaBody } from './dto/updateNode.dto';
+import {
+  NodeMoveBody,
+  NodeMoveResponse,
+  NodeUpdateResponse,
+  UpdateNodeMetaBody
+} from './dto/updateNode.dto';
 import { Node } from './node.model';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { ApiSuccessResponse } from 'src/common/response/api-success-response.decorator';
@@ -45,41 +51,38 @@ export class NodeController {
 
   @Post('/project')
   @ApiOperation({
-    summary: '프로젝트 노드 생성 생성',
-    description: '워크스페이스에 새 노드를 생성합니다.'
+    summary: '프로젝트 노드 생성',
+    description:
+      '워크스페이스에 새 프로젝트 노드를 생성합니다. 생성된 노드 정보를 반환합니다(다른 사용자에게는 WS NODE_CREATE 이벤트로 전송).'
   })
-  @ApiSuccessResponse({ type: 'string', example: '생성성공' }, 201)
+  @ApiSuccessResponse(NodeCreateReponse, 201, '프로젝트 노드 생성 성공')
   async createProjectNode(
     @Param('workspaceId') workspaceId: string,
     @Body() body: CreateProjectNodeBody,
     @Request() req: any
-  ) {
+  ): Promise<NodeCreateReponse> {
     const userId = req.user?.user_id;
     const node = Node.fromProjectDto(body, workspaceId, userId);
-    const nodeId = await this.nodeService.createProjectNode(node);
-    return { nodeId };
+
+    return await this.nodeService.createProjectNode(node);
   }
 
   @Post('/md')
   @ApiOperation({
-    summary: 'MD 노드 생성 생성',
-    description: '워크스페이스에 새 노드를 생성합니다.'
+    summary: 'MD 노드 생성',
+    description:
+      '워크스페이스에 새 마크다운 노드를 생성합니다. 생성된 노드 정보를 반환합니다(다른 사용자에게는 WS NODE_CREATE 이벤트로 전송).'
   })
-  @ApiSuccessResponse(
-    { type: 'string', example: '생성 성공' },
-    201,
-    'MD 노드 생성 성공'
-  )
+  @ApiSuccessResponse(NodeCreateReponse, 201, 'MD 노드 생성 성공')
   async createMarkdownNode(
     @Request() req: any,
     @Param('workspaceId') workspaceId: string,
     @Body() body: CreateMarkDownNodeBody
-  ) {
+  ): Promise<NodeCreateReponse> {
     const userId = req.user?.user_id;
     const node = Node.fromMarkDownDto(body, workspaceId, userId);
-    console.log(node);
-    const nodeId = await this.nodeService.createMarkdownNode(node);
-    return { nodeId };
+
+    return await this.nodeService.createMarkdownNode(node);
   }
 
   @Get('search')
@@ -141,53 +144,49 @@ export class NodeController {
   @ApiOperation({
     summary: '노드 메타 수정',
     description:
-      '노드의 제목, 색깔(color/textColor)을 수정합니다. MD 내용은 YJS로 편집하세요.'
+      '노드의 제목, 색깔(color/textColor)을 수정합니다. MD 내용은 YJS로 편집하세요. propagateToChildren=true 이고 색상 변경이 있는 경우, 응답에 자식 노드별 patch가 descendants 배열로 포함됩니다(다른 사용자에게는 WS NODE_UPDATE 이벤트로 전송).'
   })
   @ApiParam({ name: 'nodeId', description: '노드 아이디' })
-  @ApiSuccessResponse(
-    { type: 'string', example: '수정 성공' },
-    200,
-    '노드 메타 수정 성공'
-  )
+  @ApiSuccessResponse(NodeUpdateResponse, 200, '노드 메타 수정 성공')
   async updateNodeMeta(
     @Request() req: any,
     @Body() body: UpdateNodeMetaBody,
     @Param('nodeId') nodeId: string,
     @Param('workspaceId') workspaceId: string
-  ) {
+  ): Promise<NodeUpdateResponse> {
     const userId = req.user?.user_id;
-    await this.nodeService.updateNodeMeta(userId, nodeId, workspaceId, body);
-    return '수정 성공';
+    return await this.nodeService.updateNodeMeta(
+      userId,
+      nodeId,
+      workspaceId,
+      body
+    );
   }
 
   @Patch('/:nodeId/move')
   @ApiOperation({
     summary: '노드 이동',
-    description: 'Node의 position x,y 정보만 업데이트 합니다.'
+    description:
+      'Node의 position x,y 정보만 업데이트 합니다. 자손 노드는 동일 delta만큼 함께 이동합니다(다른 사용자에게는 WS NODE_MOVE 이벤트로 root 좌표만 전송, 자손은 delta로 계산).'
   })
   @ApiParam({
     name: 'nodeId',
     description: '노드 아이디'
   })
-  @ApiSuccessResponse(
-    { type: 'string', example: '이동 성공' },
-    200,
-    '노드 이동 성공'
-  )
+  @ApiSuccessResponse(NodeMoveResponse, 200, '노드 이동 성공')
   async moveNode(
     @Request() req: any,
     @Body() body: NodeMoveBody,
     @Param('nodeId') nodeId: string,
     @Param('workspaceId') workspaceId: string
-  ) {
+  ): Promise<NodeMoveResponse> {
     const userId = req.user?.user_id;
-    await this.nodeService.updateNodePosition(
+    return await this.nodeService.updateNodePosition(
       body,
       userId,
       workspaceId,
       nodeId
     );
-    return '이동 성공';
   }
 
   // @Post('/pdf')
@@ -209,9 +208,15 @@ export class NodeController {
   @Delete(':nodeId')
   @ApiOperation({
     summary: '노드 삭제',
-    description: '특정 노드를 삭제합니다.'
+    description:
+      '특정 노드를 삭제합니다(다른 사용자에게는 WS NODE_DELETE 이벤트로 전송).'
   })
   @ApiParam({ name: 'nodeId', description: '노드 ID' })
+  @ApiSuccessResponse(
+    { type: 'string', example: '노드 삭제' },
+    200,
+    '노드 삭제 성공'
+  )
   async deleteNode(
     @Request() req: any,
     @Param('workspaceId') workspaceId: string,

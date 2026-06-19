@@ -4,6 +4,7 @@ import { EdgeService } from './edge.service';
 import { EdgeRepository } from './edge.repository';
 import { WorkspaceRepository } from '../workspace/workspace.repository';
 import { NodeRepository } from '../node/node.repository';
+import { NodeService } from '../node/node.service';
 import { WsGateway } from '../ws/ws.gateway';
 import { RedisService } from '../redis/redis.service';
 
@@ -21,28 +22,32 @@ describe('EdgeController', () => {
             findEdge: jest.fn(),
             findEdgesBySource: jest.fn(),
             findAllEdgesInWorkspace: jest.fn(),
-            createEdge: jest.fn(),
-          },
+            createEdge: jest.fn()
+          }
         },
         {
           provide: WorkspaceRepository,
-          useValue: { checkWorkspace: jest.fn() },
+          useValue: { checkWorkspace: jest.fn() }
         },
         {
           provide: NodeRepository,
-          useValue: { selectNodeById: jest.fn() },
+          useValue: { selectNodeById: jest.fn() }
+        },
+        {
+          provide: NodeService,
+          useValue: { propagateDepth: jest.fn() }
         },
         {
           provide: WsGateway,
-          useValue: { broadcast: jest.fn() },
+          useValue: { broadcast: jest.fn() }
         },
         {
           provide: RedisService,
           useValue: {
-            getClient: jest.fn().mockReturnValue({ del: jest.fn() }),
-          },
-        },
-      ],
+            getClient: jest.fn().mockReturnValue({ del: jest.fn() })
+          }
+        }
+      ]
     }).compile();
 
     controller = module.get<EdgeController>(EdgeController);

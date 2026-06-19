@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsNumber, IsString, IsUrl, ValidateNested } from 'class-validator';
+import { node_type_enum } from '@prisma/client';
 
 export class MarkDownBody {
   @IsString()
@@ -93,4 +94,24 @@ export class CreatePdfNodeBody {
   @ValidateNested()
   @Type(() => PdfDataDto)
   data: PdfDataDto;
+}
+
+export class NodeCreateReponse {
+  @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
+  nodeId: string;
+
+  @ApiProperty({ example: '프로젝트 노드', nullable: true })
+  title: string | null;
+
+  @ApiProperty({ enum: ['PROJECT', 'DATA', 'RESOURCE', 'ARCHIVE'] })
+  nodeType: node_type_enum;
+
+  @ApiProperty({ type: PositionDto })
+  position: { x: number; y: number };
+
+  @ApiProperty({ type: Object, example: { color: '#ffffff' } })
+  data: Record<string, unknown>;
+
+  @ApiProperty({ example: 'Mon May 29 2026' })
+  createdAt: string;
 }

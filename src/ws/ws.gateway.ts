@@ -28,6 +28,8 @@ import {
   yjsWsRoom
 } from '../yjs/yjs.constants';
 
+const userRoom = (userId: string) => `user:${userId}`;
+
 @WebSocketGateway({
   cors: { origin: '*' },
   namespace: '/workspace'
@@ -77,7 +79,15 @@ export class WsGateway
 
     try {
       const payload = this.jwtService.verify(token);
-      client.data.userId = payload.user_id;
+      const userId =
+        payload && typeof payload.user_id === 'string' ? payload.user_id : null;
+
+      if (!userId) {
+        client.disconnect();
+        return;
+      }
+      client.data.userId = userId;
+      client.join(userRoom(userId));
       this.wsMetrics.increment();
     } catch (err) {
       client.disconnect();
@@ -353,7 +363,10 @@ export class WsGateway
   // ── Broadcast (REST → WS) ────────────────────────────────────
 
   broadcast(event: WsEvent): void {
-    this.server.to(event.workspaceId).emit('workspace_event', event);
+    this.server
+      .to(event.workspaceId)
+      .except(userRoom(event.userId))
+      .emit('workspace_event', event);
 
     // 노드 삭제 시 Yjs doc 정리
     if (event.type === 'NODE_DELETE') {
