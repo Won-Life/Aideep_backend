@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   Request,
   UseGuards
 } from '@nestjs/common';
@@ -179,5 +180,17 @@ export class WorkspaceController {
   ) {
     const userId = req.user?.user_id;
     return await this.workspaceService.getWorkspaceInfo(userId, workspaceId);
+  }
+
+  @Get('members')
+  async getWorkspaceMembers(
+    @Query('workspaceId') workspaceId: string,
+    @Request() req: any
+  ) {
+    const userId = req.user?.user_id;
+    return await this.workspaceService.getWorkspaceMemebers(
+      userId,
+      workspaceId
+    );
   }
 }

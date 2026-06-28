@@ -206,6 +206,19 @@ export class WorkspaceService {
     await this.workspaceRepository.softDeleteWorkspace(workspaceId);
   }
 
+  async getWorkspaceMemebers(userId: string, workspaceId: string) {
+    const check = await this.checkExist(userId, workspaceId);
+
+    if (check.deleted_at)
+      throw new NotFoundException(
+        '해당 유저의 워크스페이스가 존재하지 않습니다.'
+      );
+    const data = await this.workspaceRepository.selectMemberlist(workspaceId);
+
+    console.log(data);
+    return;
+  }
+
   async renameWorkspace(
     userId: string,
     workspaceId: string,
