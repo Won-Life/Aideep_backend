@@ -131,16 +131,12 @@ export class EmbeddingWorkerService implements OnModuleInit, OnModuleDestroy {
     const res = await fetch(`${this.aiServerUrl}/embed`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        ...(this.aiApiKey ? { Authorization: `Bearer ${this.aiApiKey}` } : {})
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        nodeId,
-        op: meta.op,
-        workspaceId: meta.workspaceId
+        node_id: nodeId
       })
     });
-
     if (!res.ok) {
       throw new Error(`AI /embed 응답 오류: ${res.status}`);
     }

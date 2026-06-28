@@ -16,7 +16,7 @@ import { WinstonModule } from 'nest-winston';
 import { EdgeModule } from './edge/edge.module';
 import { UploadModule } from './upload/upload.module';
 import { MetricsModule } from './common/metrics';
-import { ChatModule } from './chat/chat.module';
+// import { ChatModule } from './chat/chat.module';
 import { EmbeddingModule } from './embedding/embedding.module';
 import { createWinstonConsoleTransport } from './common/logging/winston.console';
 
@@ -36,7 +36,7 @@ import { createWinstonConsoleTransport } from './common/logging/winston.console'
     EdgeModule,
     UploadModule,
     MetricsModule,
-    ChatModule,
+    // ChatModule,
     EmbeddingModule
   ],
   controllers: [AppController],
