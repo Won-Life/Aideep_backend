@@ -31,6 +31,7 @@ import {
 } from './dto/updateNode.dto';
 import { Transactional } from 'src/prisma/transactional.decorator';
 import { NodeCreateReponse } from './dto/createNode.dto';
+import { EmbeddingScheduleService } from 'src/embedding/embedding.schedule.service';
 
 @Injectable()
 export class NodeService {
@@ -40,7 +41,8 @@ export class NodeService {
     private readonly edgeRepository: EdgeRepository,
     @Inject(forwardRef(() => WsGateway))
     private readonly wsGateway: WsGateway,
-    private readonly redisService: RedisService
+    private readonly redisService: RedisService,
+    private readonly embeddingSchedule: EmbeddingScheduleService
   ) {}
 
   private async checkEditPermission(userId: string, workspaceId: string) {
@@ -82,6 +84,12 @@ export class NodeService {
       node: nodeAns
     } as NodeCreateEvent);
 
+    await this.embeddingSchedule.schedule(
+      ans.node_id,
+      ans.workspace_id,
+      'UPSERT'
+    );
+
     return nodeAns;
   }
 
@@ -108,6 +116,12 @@ export class NodeService {
       userId: node.userId,
       node: nodeAns
     } as NodeCreateEvent);
+
+    await this.embeddingSchedule.schedule(
+      ans.node_id,
+      ans.workspace_id,
+      'UPSERT'
+    );
 
     return nodeAns;
   }
@@ -310,6 +324,12 @@ export class NodeService {
       }
     }
 
+    await this.embeddingSchedule.schedule(
+      existing.node_id,
+      workspaceId,
+      'UPSERT'
+    );
+
     return {
       nodeId: existing.node_id,
       patch
@@ -463,6 +483,9 @@ export class NodeService {
       userId: userId,
       nodeId: nodeId
     } as NodeDeleteEvent);
+
+    await this.embeddingSchedule.schedule(nodeId, workspaceId, 'DELETE');
+
     return '노드 삭제';
   }
 }

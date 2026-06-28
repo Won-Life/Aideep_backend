@@ -5,9 +5,10 @@ import { NodeRepository } from './node.repository';
 import { WorkspaceRepository } from 'src/workspace/workspace.repository';
 import { EdgeRepository } from 'src/edge/edge.repository';
 import { WsModule } from 'src/ws/ws.module';
+import { EmbeddingModule } from 'src/embedding/embedding.module';
 
 @Module({
-  imports: [forwardRef(() => WsModule)],
+  imports: [forwardRef(() => WsModule), EmbeddingModule],
   controllers: [NodeController],
   providers: [NodeService, NodeRepository, WorkspaceRepository, EdgeRepository],
   exports: [NodeRepository, NodeService]
