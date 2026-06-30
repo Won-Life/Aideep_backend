@@ -70,8 +70,13 @@ export class UserWokrpaceInfoDto {
 
 export class WorkspaceMemberListDto {
   @IsString()
+  @ApiProperty({ example: 'seoki' })
   userName: string;
 
   @IsEnum(workspace_role_enum)
-  role: string;
+  @ApiProperty({
+    enum: workspace_role_enum,
+    example: workspace_role_enum.OWNER
+  })
+  role: workspace_role_enum;
 }

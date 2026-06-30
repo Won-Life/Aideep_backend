@@ -7,12 +7,16 @@ import {
   Patch,
   Post,
   Query,
-  Req,
   Request,
   UseGuards
 } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/guards/jwt.guard';
-import { ApiBearerAuth, ApiBody, ApiOperation } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOperation,
+  ApiQuery
+} from '@nestjs/swagger';
 import { ApiErrorResponse } from 'src/common/response/api-error-response.decorator';
 import {
   CreateWorkspaceBody,
@@ -24,7 +28,11 @@ import {
   JoinWorkspaceBody
 } from './dto/joinWorkspace.dto';
 import { ApiSuccessResponse } from 'src/common/response/api-success-response.decorator';
-import { UserWokrpaceInfoDto, WorkspaceInfoDto } from './dto/workspaceInfo.dto';
+import {
+  UserWokrpaceInfoDto,
+  WorkspaceInfoDto,
+  WorkspaceMemberListDto
+} from './dto/workspaceInfo.dto';
 import {
   LeaveWorkspaceBody,
   LeaveWorkspaceResponseDto
@@ -183,10 +191,18 @@ export class WorkspaceController {
   }
 
   @Get('members')
+  @ApiOperation({
+    summary: '워크스페이스 멤버 목록 조회',
+    description:
+      '해당 워크스페이스에 속한 멤버의 이름과 역할 목록을 반환합니다.'
+  })
+  @ApiQuery({ name: 'workspaceId', required: true })
+  @ApiSuccessResponse(WorkspaceMemberListDto, 200, '조회 성공')
+  @ApiErrorResponse(404, '해당 유저의 워크스페이스가 존재하지 않습니다.')
   async getWorkspaceMembers(
     @Query('workspaceId') workspaceId: string,
     @Request() req: any
-  ) {
+  ): Promise<WorkspaceMemberListDto[]> {
     const userId = req.user?.user_id;
     return await this.workspaceService.getWorkspaceMemebers(
       userId,
