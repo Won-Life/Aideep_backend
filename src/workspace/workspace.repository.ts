@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateWorkspaceBody } from './dto/createWorkspace.dto';
 import { workspace_role_enum } from '../generated/prisma/client';
+import { WorkspaceMemberListDto } from './dto/workspaceInfo.dto';
 
 @Injectable()
 export class WorkspaceRepository {
@@ -92,6 +93,18 @@ export class WorkspaceRepository {
   async countActiveUserWorkspaces(userId: string): Promise<number> {
     return await this.prisma.client.users_workspaces.count({
       where: { user_id: userId, deleted_at: null }
+    });
+  }
+
+  async selectMemberlist(workspaceId: string) {
+    return await this.prisma.client.users_workspaces.findMany({
+      where: { workspace_id: workspaceId, deleted_at: null },
+      select: {
+        role: true,
+        users: {
+          select: { username: true }
+        }
+      }
     });
   }
 }

@@ -13,7 +13,11 @@ import {
 } from './dto/createWorkspace.dto';
 import { Transactional } from 'src/prisma/transactional.decorator';
 import { NodeRepository } from 'src/node/node.repository';
-import { UserWokrpaceInfoDto, WorkspaceInfoDto } from './dto/workspaceInfo.dto';
+import {
+  UserWokrpaceInfoDto,
+  WorkspaceInfoDto,
+  WorkspaceMemberListDto
+} from './dto/workspaceInfo.dto';
 import { RedisService } from 'src/redis/redis.service';
 import { REDIS_KEYS } from 'src/redis/redis.keys';
 import {
@@ -204,6 +208,24 @@ export class WorkspaceService {
 
     await this.workspaceRepository.softDeleteAllMembers(workspaceId);
     await this.workspaceRepository.softDeleteWorkspace(workspaceId);
+  }
+
+  async getWorkspaceMemebers(
+    userId: string,
+    workspaceId: string
+  ): Promise<WorkspaceMemberListDto[]> {
+    const check = await this.checkExist(userId, workspaceId);
+
+    if (check.deleted_at)
+      throw new NotFoundException(
+        '해당 유저의 워크스페이스가 존재하지 않습니다.'
+      );
+    const data = await this.workspaceRepository.selectMemberlist(workspaceId);
+
+    return data.map((m) => ({
+      userName: m.users.username,
+      role: m.role
+    })) as WorkspaceMemberListDto[];
   }
 
   async renameWorkspace(
