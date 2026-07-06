@@ -5,6 +5,8 @@ import { WorkspaceRepository } from '../workspace/workspace.repository';
 import { EdgeRepository } from '../edge/edge.repository';
 import { WsGateway } from '../ws/ws.gateway';
 import { RedisService } from '../redis/redis.service';
+import { FileAttachmentService } from '../file-attachment/file-attachment.service';
+import { setTransactionRunner } from '../prisma/transaction.storage';
 
 const MOCK_NODE_ID = '550e8400-e29b-41d4-a716-446655440000';
 const MOCK_WORKSPACE_ID = 'ws-uuid-5678';
@@ -30,12 +32,18 @@ describe('NodeService', () => {
   let workspaceRepository: { [K: string]: jest.Mock };
   let edgeRepository: { [K: string]: jest.Mock };
   let wsGateway: { broadcast: jest.Mock };
+  let fileAttachmentService: { [K: string]: jest.Mock };
 
   const mockRedisClient = {
     get: jest.fn(),
     set: jest.fn(),
     del: jest.fn()
   };
+
+  beforeAll(() => {
+    // @Transactional() 데코레이터가 사용하는 러너를 pass-through로 설정
+    setTransactionRunner((fn) => fn());
+  });
 
   beforeEach(async () => {
     nodeRepository = {
@@ -57,6 +65,10 @@ describe('NodeService', () => {
       deleteEdgesByNodeId: jest.fn()
     };
     wsGateway = { broadcast: jest.fn() };
+    fileAttachmentService = {
+      syncNodeAttachments: jest.fn(),
+      releaseNodeAttachments: jest.fn()
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -65,6 +77,7 @@ describe('NodeService', () => {
         { provide: WorkspaceRepository, useValue: workspaceRepository },
         { provide: EdgeRepository, useValue: edgeRepository },
         { provide: WsGateway, useValue: wsGateway },
+        { provide: FileAttachmentService, useValue: fileAttachmentService },
         {
           provide: RedisService,
           useValue: { getClient: jest.fn().mockReturnValue(mockRedisClient) }
@@ -187,6 +200,46 @@ describe('NodeService', () => {
           type: 'NODE_CREATE',
           workspaceId: MOCK_WORKSPACE_ID,
           userId: MOCK_USER_ID
+        })
+      );
+    });
+
+    it('should sync file attachments with inserted content', async () => {
+      await service.createMarkdownNode(mdNode as any);
+
+      expect(fileAttachmentService.syncNodeAttachments).toHaveBeenCalledWith(
+        MOCK_NODE_ID,
+        MOCK_WORKSPACE_ID,
+        mdInsertResult.content
+      );
+    });
+  });
+
+  describe('deleteNode', () => {
+    beforeEach(() => {
+      workspaceRepository.checkWorkspace.mockResolvedValue({ role: 'OWNER' });
+      nodeRepository.selectNodeById.mockResolvedValue(mockInsertResult);
+      nodeRepository.deleteNode.mockResolvedValue(undefined);
+      edgeRepository.deleteEdgesByNodeId.mockResolvedValue(undefined);
+    });
+
+    it('should release file attachments before deleting the node', async () => {
+      await service.deleteNode(MOCK_WORKSPACE_ID, MOCK_USER_ID, MOCK_NODE_ID);
+
+      expect(fileAttachmentService.releaseNodeAttachments).toHaveBeenCalledWith(
+        MOCK_NODE_ID
+      );
+      expect(nodeRepository.deleteNode).toHaveBeenCalledWith(MOCK_NODE_ID);
+    });
+
+    it('should broadcast NODE_DELETE event via WsGateway', async () => {
+      await service.deleteNode(MOCK_WORKSPACE_ID, MOCK_USER_ID, MOCK_NODE_ID);
+
+      expect(wsGateway.broadcast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'NODE_DELETE',
+          workspaceId: MOCK_WORKSPACE_ID,
+          nodeId: MOCK_NODE_ID
         })
       );
     });

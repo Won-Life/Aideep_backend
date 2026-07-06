@@ -31,6 +31,7 @@ import {
 } from './dto/updateNode.dto';
 import { Transactional } from 'src/prisma/transactional.decorator';
 import { NodeCreateReponse } from './dto/createNode.dto';
+import { FileAttachmentService } from 'src/file-attachment/file-attachment.service';
 
 @Injectable()
 export class NodeService {
@@ -40,7 +41,8 @@ export class NodeService {
     private readonly edgeRepository: EdgeRepository,
     @Inject(forwardRef(() => WsGateway))
     private readonly wsGateway: WsGateway,
-    private readonly redisService: RedisService
+    private readonly redisService: RedisService,
+    private readonly fileAttachmentService: FileAttachmentService
   ) {}
 
   private async checkEditPermission(userId: string, workspaceId: string) {
@@ -85,9 +87,16 @@ export class NodeService {
     return nodeAns;
   }
 
+  @Transactional()
   async createMarkdownNode(node: Node): Promise<NodeCreateReponse> {
     await this.checkEditPermission(node.userId, node.workspaceId);
     const ans = await this.nodeRespository.insertNode(node);
+
+    await this.fileAttachmentService.syncNodeAttachments(
+      ans.node_id,
+      ans.workspace_id,
+      ans.content
+    );
 
     await this.redisService
       .getClient()
@@ -451,6 +460,7 @@ export class NodeService {
 
     if (!existing) throw new NotFoundException('노드를 찾을 수 없습니다.');
 
+    await this.fileAttachmentService.releaseNodeAttachments(nodeId);
     await this.edgeRepository.deleteEdgesByNodeId(nodeId);
     await this.nodeRespository.deleteNode(nodeId);
     await this.redisService
