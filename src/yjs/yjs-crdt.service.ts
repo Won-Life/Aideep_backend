@@ -3,12 +3,15 @@ import * as Y from 'yjs';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { RedisService } from 'src/redis/redis.service';
 import { REDIS_KEYS } from 'src/redis/redis.keys';
+import { Transactional } from 'src/prisma/transactional.decorator';
+import { FileAttachmentService } from 'src/file-attachment/file-attachment.service';
 
 @Injectable()
 export class YjsCrdtService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly redis: RedisService
+    private readonly redis: RedisService,
+    private readonly fileAttachmentService: FileAttachmentService
   ) {}
 
   // ── Redis 계층 ──────────────────────────────────────────────
@@ -70,6 +73,7 @@ export class YjsCrdtService {
     return { state: null, workspaceId: node.workspace_id };
   }
 
+  @Transactional()
   async saveToDb(
     nodeId: string,
     state: Buffer,
@@ -94,6 +98,12 @@ export class YjsCrdtService {
         updated_at: new Date()
       }
     });
+
+    await this.fileAttachmentService.syncNodeAttachments(
+      nodeId,
+      workspaceId,
+      updatedContent
+    );
 
     // workspace sync 캐시 무효화
     await this.redis
