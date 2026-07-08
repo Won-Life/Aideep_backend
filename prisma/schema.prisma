@@ -48,6 +48,7 @@ model nodes {
   search_text                  String?        @default(dbgenerated("(((COALESCE(title, ''::character varying))::text || ' '::text) || COALESCE((content ->> 'markdownBody'::text), ''::text))"))
   edges_edges_source_idTonodes edges[]        @relation("edges_source_idTonodes")
   edges_edges_target_idTonodes edges[]        @relation("edges_target_idTonodes")
+  file_attachments             file_attachments[]
   workspaces                   workspaces     @relation(fields: [workspace_id], references: [workspace_id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([workspace_id], map: "idx_nodes_workspace")
@@ -109,21 +110,37 @@ model workspaces {
 }
 
 model files {
-  file_id       String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  file_url      String     @db.VarChar(2048)
-  s3_key        String     @db.VarChar(1024)
-  mime_type     String     @db.VarChar(100)
-  size          Int
-  owner_user_id String     @db.Uuid
-  workspace_id  String     @db.Uuid
-  created_at    DateTime   @default(now()) @db.Timestamptz(6)
-  updated_at    DateTime   @default(now()) @db.Timestamptz(6)
-  deleted_at    DateTime?  @db.Timestamptz(6)
-  users         users      @relation(fields: [owner_user_id], references: [user_id], onUpdate: NoAction)
-  workspaces    workspaces @relation(fields: [workspace_id], references: [workspace_id], onDelete: Cascade, onUpdate: NoAction)
+  file_id          String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  file_url         String             @db.VarChar(2048)
+  s3_key           String             @db.VarChar(1024)
+  mime_type        String             @db.VarChar(100)
+  size             Int
+  owner_user_id    String             @db.Uuid
+  workspace_id     String             @db.Uuid
+  status           file_status_enum   @default(PENDING)
+  orphaned_at      DateTime?          @db.Timestamptz(6)
+  created_at       DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime           @default(now()) @db.Timestamptz(6)
+  deleted_at       DateTime?          @db.Timestamptz(6)
+  file_attachments file_attachments[]
+  users            users              @relation(fields: [owner_user_id], references: [user_id], onUpdate: NoAction)
+  workspaces       workspaces         @relation(fields: [workspace_id], references: [workspace_id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([owner_user_id], map: "idx_files_owner")
   @@index([workspace_id], map: "idx_files_workspace")
+  @@index([status], map: "idx_files_status")
+}
+
+model file_attachments {
+  file_id    String   @db.Uuid
+  node_id    String   @db.Uuid
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  files      files    @relation(fields: [file_id], references: [file_id], onDelete: Cascade, onUpdate: NoAction)
+  nodes      nodes    @relation(fields: [node_id], references: [node_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([file_id, node_id])
+  @@index([node_id], map: "idx_file_attachments_node")
+  @@index([file_id], map: "idx_file_attachments_file")
 }
 
 enum node_type_enum {
@@ -137,4 +154,11 @@ enum workspace_role_enum {
   OWNER
   VIEWER
   EDITOR
+}
+
+enum file_status_enum {
+  PENDING
+  ACTIVE
+  ORPHAN
+  DELETED
 }

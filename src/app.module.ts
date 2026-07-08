@@ -1,5 +1,6 @@
 import { Logger, MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { AppController } from './app.controller';
@@ -21,6 +22,7 @@ import { createWinstonConsoleTransport } from './common/logging/winston.console'
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     WinstonModule.forRoot({
       transports: [createWinstonConsoleTransport()]
     }),

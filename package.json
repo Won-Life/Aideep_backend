@@ -29,6 +29,7 @@
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/platform-socket.io": "^11.1.14",
+    "@nestjs/schedule": "6.1.3",
     "@nestjs/serve-static": "^5.0.4",
     "@nestjs/swagger": "^11.2.6",
     "@nestjs/websockets": "^11.1.14",
@@ -120,7 +121,8 @@
     "coverageDirectory": "../coverage",
     "testEnvironment": "node",
     "moduleNameMapper": {
-      "^src/(.*)$": "<rootDir>/$1"
+      "^src/(.*)$": "<rootDir>/$1",
+      "^uuid$": "<rootDir>/../test/mocks/uuid.ts"
     }
   }
 }

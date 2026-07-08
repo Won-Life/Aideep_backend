@@ -3,6 +3,8 @@ import * as Y from 'yjs';
 import { YjsCrdtService } from './yjs-crdt.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { RedisService } from 'src/redis/redis.service';
+import { FileAttachmentService } from 'src/file-attachment/file-attachment.service';
+import { setTransactionRunner } from 'src/prisma/transaction.storage';
 
 describe('YjsCrdtService', () => {
   let service: YjsCrdtService;
@@ -11,6 +13,12 @@ describe('YjsCrdtService', () => {
   let mockRedisDel: jest.Mock;
   let mockPrismaFindUnique: jest.Mock;
   let mockPrismaUpdate: jest.Mock;
+  let mockSyncNodeAttachments: jest.Mock;
+
+  beforeAll(() => {
+    // @Transactional() 데코레이터가 사용하는 러너를 pass-through로 설정
+    setTransactionRunner((fn) => fn());
+  });
 
   beforeEach(async () => {
     mockRedisGet = jest.fn();
@@ -18,6 +26,7 @@ describe('YjsCrdtService', () => {
     mockRedisDel = jest.fn();
     mockPrismaFindUnique = jest.fn();
     mockPrismaUpdate = jest.fn();
+    mockSyncNodeAttachments = jest.fn();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -42,6 +51,10 @@ describe('YjsCrdtService', () => {
               del: mockRedisDel,
             }),
           },
+        },
+        {
+          provide: FileAttachmentService,
+          useValue: { syncNodeAttachments: mockSyncNodeAttachments },
         },
       ],
     }).compile();
@@ -157,6 +170,32 @@ describe('YjsCrdtService', () => {
       mockRedisDel.mockResolvedValue(1);
       await service.deleteFromRedis('node-1');
       expect(mockRedisDel).toHaveBeenCalled();
+    });
+  });
+
+  describe('saveToDb', () => {
+    it('updates node content and syncs file attachments', async () => {
+      mockPrismaFindUnique.mockResolvedValue({
+        content: { dataType: 'MARKDOWN', markdownBody: 'old' },
+      });
+      mockPrismaUpdate.mockResolvedValue({});
+      mockRedisDel.mockResolvedValue(1);
+
+      const state = Buffer.from([1, 2, 3]);
+      await service.saveToDb('node-1', state, '# new body', 'ws-1');
+
+      expect(mockPrismaUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { node_id: 'node-1' },
+          data: expect.objectContaining({
+            content: { dataType: 'MARKDOWN', markdownBody: '# new body' },
+          }),
+        }),
+      );
+      expect(mockSyncNodeAttachments).toHaveBeenCalledWith('node-1', 'ws-1', {
+        dataType: 'MARKDOWN',
+        markdownBody: '# new body',
+      });
     });
   });
 });
