@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, nodes } from '../generated/prisma/client';
+import { Prisma, nodes, node_type_enum } from '../generated/prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Node } from './node.model';
 import { tree } from 'lib0';
@@ -235,6 +235,7 @@ export class NodeRepository {
       positionX?: number;
       positionY?: number;
       content?: Prisma.InputJsonValue;
+      nodeType?: node_type_enum;
     }
   ) {
     return await this.prisma.client.nodes.update({
@@ -248,6 +249,9 @@ export class NodeRepository {
           position_y: updates.positionY
         }),
         ...(updates.content !== undefined && { content: updates.content }),
+        ...(updates.nodeType !== undefined && {
+          node_type: updates.nodeType
+        }),
         version: { increment: 1 }
       }
     });

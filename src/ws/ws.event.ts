@@ -41,6 +41,7 @@ export interface NodeUpdateEvent extends WsEventBase {
     title?: string;
     position?: { x: number; y: number };
     data?: Record<string, unknown>;
+    nodeType?: string;
   };
 }
 

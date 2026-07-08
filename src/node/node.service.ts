@@ -223,7 +223,7 @@ export class NodeService {
     workspaceId: string,
     body: UpdateNodeMetaBody
   ): Promise<NodeUpdateResponse> {
-    const { title, color, textColor, propagateToChildren } = body;
+    const { title, color, textColor, propagateToChildren, nodeType } = body;
     await this.checkEditPermission(userId, workspaceId);
 
     const existing = await this.nodeRespository.selectNodeById(
@@ -241,6 +241,7 @@ export class NodeService {
 
     await this.nodeRespository.updateNode(workspaceId, nodeId, {
       ...(title !== undefined && { title }),
+      ...(nodeType !== undefined && { nodeType }),
       content: updatedContent
     });
 
@@ -252,6 +253,7 @@ export class NodeService {
     if (title !== undefined) patch.title = title;
     if (color !== undefined || textColor !== undefined)
       patch.data = updatedContent;
+    if (nodeType !== undefined) patch.nodeType = nodeType;
 
     this.wsGateway.broadcast({
       type: 'NODE_UPDATE',
