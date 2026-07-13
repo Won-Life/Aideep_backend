@@ -199,6 +199,10 @@ export class EdgeService {
 
     const isExist = await this.edgeRepository.findEdgeById(edgeId);
     if (!isExist) throw new NotFoundException('해당 엣지가 존재하지 않습니다.');
+    if (isExist.workspace_id !== workspaceId)
+      throw new ForbiddenException(
+        '해당 엣지는 이 워크스페이스에 속하지 않습니다.'
+      );
 
     const { sourceHandle, targetHandle } = body;
     await this.edgeRepository.updateEdge(edgeId, {
