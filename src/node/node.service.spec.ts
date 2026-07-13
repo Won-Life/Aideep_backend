@@ -147,6 +147,106 @@ describe('NodeService', () => {
     });
   });
 
+  describe('updateNodeMeta', () => {
+    const existingNode = {
+      node_id: MOCK_NODE_ID,
+      workspace_id: MOCK_WORKSPACE_ID,
+      title: 'Old Title',
+      node_type: 'DATA',
+      content: { color: '#ffffff', textColor: '#000000' },
+      version: 1,
+      created_at: new Date('2026-01-01'),
+      updated_at: new Date('2026-01-01'),
+      deleted_at: null,
+      position_x: 100,
+      position_y: 200,
+      depth: 0
+    };
+
+    beforeEach(() => {
+      workspaceRepository.checkWorkspace.mockResolvedValue({ role: 'OWNER' });
+      nodeRepository.selectNodeById.mockResolvedValue(existingNode);
+      nodeRepository.updateNode.mockResolvedValue(existingNode);
+    });
+
+    it('should persist nodeType and include it in the patch/response', async () => {
+      const result = await service.updateNodeMeta(
+        MOCK_USER_ID,
+        MOCK_NODE_ID,
+        MOCK_WORKSPACE_ID,
+        { nodeType: 'PROJECT' } as any
+      );
+
+      expect(nodeRepository.updateNode).toHaveBeenCalledWith(
+        MOCK_WORKSPACE_ID,
+        MOCK_NODE_ID,
+        expect.objectContaining({ nodeType: 'PROJECT' })
+      );
+      expect(result.patch).toEqual(expect.objectContaining({ nodeType: 'PROJECT' }));
+    });
+
+    it('should broadcast NODE_UPDATE with nodeType in the patch', async () => {
+      await service.updateNodeMeta(
+        MOCK_USER_ID,
+        MOCK_NODE_ID,
+        MOCK_WORKSPACE_ID,
+        { nodeType: 'PROJECT' } as any
+      );
+
+      expect(wsGateway.broadcast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'NODE_UPDATE',
+          nodeId: MOCK_NODE_ID,
+          patch: expect.objectContaining({ nodeType: 'PROJECT' })
+        })
+      );
+    });
+
+    it('should not include nodeType in the patch when it is not provided', async () => {
+      const result = await service.updateNodeMeta(
+        MOCK_USER_ID,
+        MOCK_NODE_ID,
+        MOCK_WORKSPACE_ID,
+        { title: 'New Title' } as any
+      );
+
+      expect(result.patch.nodeType).toBeUndefined();
+      expect(nodeRepository.updateNode).toHaveBeenCalledWith(
+        MOCK_WORKSPACE_ID,
+        MOCK_NODE_ID,
+        expect.not.objectContaining({ nodeType: expect.anything() })
+      );
+    });
+
+    it('should not propagate nodeType to descendant nodes', async () => {
+      nodeRepository.selectAllDescendantIds.mockResolvedValue(['child-1']);
+      nodeRepository.selectNodesByIds.mockResolvedValue([
+        { ...existingNode, node_id: 'child-1' }
+      ]);
+
+      await service.updateNodeMeta(
+        MOCK_USER_ID,
+        MOCK_NODE_ID,
+        MOCK_WORKSPACE_ID,
+        {
+          nodeType: 'PROJECT',
+          color: '#111111',
+          propagateToChildren: true
+        } as any
+      );
+
+      const childBroadcastCall = wsGateway.broadcast.mock.calls.find(
+        ([event]: any[]) => event.nodeId === 'child-1'
+      );
+      expect(childBroadcastCall[0].patch.nodeType).toBeUndefined();
+      expect(nodeRepository.updateNode).not.toHaveBeenCalledWith(
+        MOCK_WORKSPACE_ID,
+        'child-1',
+        expect.objectContaining({ nodeType: expect.anything() })
+      );
+    });
+  });
+
   describe('createMarkdownNode', () => {
     const mdInsertResult = {
       ...mockInsertResult,

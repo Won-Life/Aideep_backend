@@ -3,11 +3,13 @@ import { Type } from 'class-transformer';
 import {
   IsBoolean,
   IsDefined,
+  IsEnum,
   IsNumber,
   IsOptional,
   IsString,
   ValidateNested
 } from 'class-validator';
+import { node_type_enum } from '../../generated/prisma/client';
 
 class PositionDto {
   @ApiProperty({ example: 100 })
@@ -39,6 +41,11 @@ export class UpdateNodeMetaBody {
   @IsOptional()
   @IsBoolean()
   propagateToChildren?: boolean;
+
+  @ApiProperty({ enum: node_type_enum, required: false })
+  @IsOptional()
+  @IsEnum(node_type_enum)
+  nodeType?: node_type_enum;
 }
 
 export class NodeMoveBody {
@@ -65,6 +72,9 @@ export class NodeUpdatePatch {
 
   @ApiProperty({ required: false, type: Object })
   data?: Record<string, unknown>;
+
+  @ApiProperty({ required: false, enum: node_type_enum })
+  nodeType?: node_type_enum;
 }
 
 export class NodeDescendantUpdate {

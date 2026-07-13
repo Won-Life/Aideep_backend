@@ -144,7 +144,7 @@ export class NodeController {
   @ApiOperation({
     summary: '노드 메타 수정',
     description:
-      '노드의 제목, 색깔(color/textColor)을 수정합니다. MD 내용은 YJS로 편집하세요. propagateToChildren=true 이고 색상 변경이 있는 경우, 응답에 자식 노드별 patch가 descendants 배열로 포함됩니다(다른 사용자에게는 WS NODE_UPDATE 이벤트로 전송).'
+      '노드의 제목, 색깔(color/textColor), 타입(nodeType)을 수정합니다. MD 내용은 YJS로 편집하세요. propagateToChildren=true 이고 색상 변경이 있는 경우, 응답에 자식 노드별 patch가 descendants 배열로 포함됩니다(nodeType은 자식에게 전파되지 않습니다. 다른 사용자에게는 WS NODE_UPDATE 이벤트로 전송).'
   })
   @ApiParam({ name: 'nodeId', description: '노드 아이디' })
   @ApiSuccessResponse(NodeUpdateResponse, 200, '노드 메타 수정 성공')
