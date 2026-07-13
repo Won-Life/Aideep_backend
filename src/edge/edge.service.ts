@@ -12,12 +12,13 @@ import { Transactional } from 'src/prisma/transactional.decorator';
 import { NodeRepository } from 'src/node/node.repository';
 import { NodeService } from 'src/node/node.service';
 import { WsGateway } from 'src/ws/ws.gateway';
-import { EdgeCreateEvent } from 'src/ws/ws.event';
+import { EdgeCreateEvent, EdgeUpdateEvent } from 'src/ws/ws.event';
 import { EdgeCreateResponse } from './dto/connectNode.dto';
 import { RedisService } from 'src/redis/redis.service';
 import { REDIS_KEYS } from 'src/redis/redis.keys';
 import { useContainer } from 'class-validator';
 import { DeleteEdgeResponse } from './dto/deleteEdge.dto';
+import { UpdateEdgeDto, UpdateEdgeResponse } from './dto/updateEdge.dto';
 
 @Injectable()
 export class EdgeService {
@@ -186,5 +187,37 @@ export class EdgeService {
     return {
       edgeId: edgeId
     };
+  }
+
+  async updateEdge(
+    workspaceId: string,
+    userId: string,
+    edgeId: string,
+    body: UpdateEdgeDto
+  ): Promise<UpdateEdgeResponse> {
+    await this.checkEditPermission(userId, workspaceId);
+
+    const isExist = await this.edgeRepository.findEdgeById(edgeId);
+    if (!isExist) throw new NotFoundException('해당 엣지가 존재하지 않습니다.');
+
+    const { sourceHandle, targetHandle } = body;
+    await this.edgeRepository.updateEdge(edgeId, {
+      sourceHandle,
+      targetHandle
+    });
+
+    const patch: EdgeUpdateEvent['patch'] = {};
+    if (sourceHandle !== undefined) patch.sourceHandle = sourceHandle;
+    if (targetHandle !== undefined) patch.targetHandle = targetHandle;
+
+    this.wsGateway.broadcast({
+      type: 'EDGE_UPDATE',
+      workspaceId,
+      userId,
+      edgeId,
+      patch
+    } as EdgeUpdateEvent);
+
+    return { edgeId, ...patch };
   }
 }
