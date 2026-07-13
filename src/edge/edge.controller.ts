@@ -3,6 +3,7 @@ import {
   Controller,
   Param,
   Post,
+  Patch,
   UseGuards,
   Request,
   Delete
@@ -19,6 +20,7 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt.guard';
 import { Edge } from './edge.model';
 import { ApiSuccessResponse } from 'src/common/response/api-success-response.decorator';
 import { DeleteEdgeResponse } from './dto/deleteEdge.dto';
+import { UpdateEdgeDto, UpdateEdgeResponse } from './dto/updateEdge.dto';
 
 @ApiTags('Edge')
 @UseGuards(JwtAuthGuard)
@@ -60,5 +62,23 @@ export class EdgeController {
   ): Promise<DeleteEdgeResponse> {
     const userId = req.user?.user_id;
     return await this.edgeService.deleteEdge(workspaceId, userId, edgeId);
+  }
+
+  @Patch('/:edgeId')
+  @ApiOperation({
+    summary: '엣지 핸들 수정',
+    description:
+      '엣지가 붙는 핸들(sourceHandle/targetHandle) 값만 부분 수정합니다(다른 사용자에게는 WS EDGE_UPDATE 이벤트로 전송).'
+  })
+  @ApiParam({ name: 'edgeId', description: '엣지 ID' })
+  @ApiSuccessResponse(UpdateEdgeResponse, 200, '엣지 수정 성공')
+  async updateEdge(
+    @Param('workspaceId') workspaceId: string,
+    @Param('edgeId') edgeId: string,
+    @Body() body: UpdateEdgeDto,
+    @Request() req: any
+  ): Promise<UpdateEdgeResponse> {
+    const userId = req.user?.user_id;
+    return await this.edgeService.updateEdge(workspaceId, userId, edgeId, body);
   }
 }
