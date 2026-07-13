@@ -62,6 +62,16 @@ export interface EdgeDeleteEvent extends WsEventBase {
   edgeId: string;
 }
 
+export interface EdgeUpdateEvent extends WsEventBase {
+  type: 'EDGE_UPDATE';
+  userId: string;
+  edgeId: string;
+  patch: {
+    sourceHandle?: string;
+    targetHandle?: string;
+  };
+}
+
 export interface CursorMoveEvent {
   userId: string;
   workspaceId: string;
@@ -95,4 +105,5 @@ export type WsEvent =
   | NodeDeleteEvent
   | NodeUpdateEvent
   | EdgeCreateEvent
-  | EdgeDeleteEvent;
+  | EdgeDeleteEvent
+  | EdgeUpdateEvent;
