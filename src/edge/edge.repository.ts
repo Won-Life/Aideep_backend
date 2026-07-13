@@ -45,6 +45,24 @@ export class EdgeRepository {
     });
   }
 
+  async updateEdge(
+    edgeId: string,
+    updates: { sourceHandle?: string; targetHandle?: string }
+  ) {
+    return await this.prisma.client.edges.update({
+      where: { edge_id: edgeId },
+      data: {
+        ...(updates.sourceHandle !== undefined && {
+          source_handle: updates.sourceHandle
+        }),
+        ...(updates.targetHandle !== undefined && {
+          target_handle: updates.targetHandle
+        }),
+        version: { increment: 1 }
+      }
+    });
+  }
+
   async createEdge(dto: Edge) {
     return await this.prisma.client.edges.create({
       data: {
