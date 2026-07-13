@@ -46,9 +46,11 @@ describe('EdgeService', () => {
           provide: EdgeRepository,
           useValue: {
             findEdge: jest.fn(),
+            findEdgeById: jest.fn(),
             findEdgesBySource: jest.fn(),
             findAllEdgesInWorkspace: jest.fn(),
-            createEdge: jest.fn()
+            createEdge: jest.fn(),
+            updateEdge: jest.fn()
           }
         },
         {
@@ -348,6 +350,74 @@ describe('EdgeService', () => {
       await service.connectNodes(dto);
 
       expect(edgeRepo.createEdge).toHaveBeenCalled();
+    });
+  });
+
+  describe('updateEdge', () => {
+    it('워크스페이스 멤버가 아니면 NotFoundException을 던진다', async () => {
+      workspaceRepo.checkWorkspace.mockResolvedValue(null);
+
+      await expect(
+        service.updateEdge('ws-1', 'user-1', 'edge-1', { sourceHandle: 'left' })
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('권한이 없으면 ForbiddenException을 던진다', async () => {
+      workspaceRepo.checkWorkspace.mockResolvedValue({ role: 'VIEWER' } as any);
+
+      await expect(
+        service.updateEdge('ws-1', 'user-1', 'edge-1', { sourceHandle: 'left' })
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('엣지가 존재하지 않으면 NotFoundException을 던진다', async () => {
+      workspaceRepo.checkWorkspace.mockResolvedValue({ role: 'OWNER' } as any);
+      edgeRepo.findEdgeById.mockResolvedValue(null);
+
+      await expect(
+        service.updateEdge('ws-1', 'user-1', 'edge-1', { sourceHandle: 'left' })
+      ).rejects.toThrow(
+        new NotFoundException('해당 엣지가 존재하지 않습니다.')
+      );
+    });
+
+    it('정상 수정 시 repository를 올바른 인자로 호출하고 patch를 반환한다', async () => {
+      workspaceRepo.checkWorkspace.mockResolvedValue({ role: 'OWNER' } as any);
+      edgeRepo.findEdgeById.mockResolvedValue({ edge_id: 'edge-1' } as any);
+      edgeRepo.updateEdge.mockResolvedValue({ edge_id: 'edge-1' } as any);
+
+      const result = await service.updateEdge('ws-1', 'user-1', 'edge-1', {
+        sourceHandle: 'left',
+        targetHandle: 'right'
+      });
+
+      expect(edgeRepo.updateEdge).toHaveBeenCalledWith('edge-1', {
+        sourceHandle: 'left',
+        targetHandle: 'right'
+      });
+      expect(result).toEqual({
+        edgeId: 'edge-1',
+        sourceHandle: 'left',
+        targetHandle: 'right'
+      });
+    });
+
+    it('정상 수정 시 EDGE_UPDATE 이벤트를 broadcast한다', async () => {
+      workspaceRepo.checkWorkspace.mockResolvedValue({ role: 'OWNER' } as any);
+      edgeRepo.findEdgeById.mockResolvedValue({ edge_id: 'edge-1' } as any);
+      edgeRepo.updateEdge.mockResolvedValue({ edge_id: 'edge-1' } as any);
+
+      await service.updateEdge('ws-1', 'user-1', 'edge-1', {
+        sourceHandle: 'left'
+      });
+
+      expect(wsGateway.broadcast).toHaveBeenCalledWith({
+        type: 'EDGE_UPDATE',
+        workspaceId: 'ws-1',
+        userId: 'user-1',
+        edgeId: 'edge-1',
+        patch: { sourceHandle: 'left' }
+      });
     });
   });
 });
