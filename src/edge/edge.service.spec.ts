@@ -381,9 +381,26 @@ describe('EdgeService', () => {
       );
     });
 
+    it('엣지가 다른 워크스페이스에 속하면 ForbiddenException을 던진다', async () => {
+      workspaceRepo.checkWorkspace.mockResolvedValue({ role: 'OWNER' } as any);
+      edgeRepo.findEdgeById.mockResolvedValue({
+        edge_id: 'edge-1',
+        workspace_id: 'ws-2'
+      } as any);
+
+      await expect(
+        service.updateEdge('ws-1', 'user-1', 'edge-1', { sourceHandle: 'left' })
+      ).rejects.toThrow(
+        new ForbiddenException('해당 엣지는 이 워크스페이스에 속하지 않습니다.')
+      );
+    });
+
     it('정상 수정 시 repository를 올바른 인자로 호출하고 patch를 반환한다', async () => {
       workspaceRepo.checkWorkspace.mockResolvedValue({ role: 'OWNER' } as any);
-      edgeRepo.findEdgeById.mockResolvedValue({ edge_id: 'edge-1' } as any);
+      edgeRepo.findEdgeById.mockResolvedValue({
+        edge_id: 'edge-1',
+        workspace_id: 'ws-1'
+      } as any);
       edgeRepo.updateEdge.mockResolvedValue({ edge_id: 'edge-1' } as any);
 
       const result = await service.updateEdge('ws-1', 'user-1', 'edge-1', {
@@ -404,7 +421,10 @@ describe('EdgeService', () => {
 
     it('정상 수정 시 EDGE_UPDATE 이벤트를 broadcast한다', async () => {
       workspaceRepo.checkWorkspace.mockResolvedValue({ role: 'OWNER' } as any);
-      edgeRepo.findEdgeById.mockResolvedValue({ edge_id: 'edge-1' } as any);
+      edgeRepo.findEdgeById.mockResolvedValue({
+        edge_id: 'edge-1',
+        workspace_id: 'ws-1'
+      } as any);
       edgeRepo.updateEdge.mockResolvedValue({ edge_id: 'edge-1' } as any);
 
       await service.updateEdge('ws-1', 'user-1', 'edge-1', {
