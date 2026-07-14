@@ -15,6 +15,7 @@ import { WsModule } from './ws/ws.module';
 import { NodeModule } from './node/node.module';
 import { WinstonModule } from 'nest-winston';
 import { EdgeModule } from './edge/edge.module';
+import { MeetModule } from './meet/meet.module';
 import { UploadModule } from './upload/upload.module';
 import { MetricsModule } from './common/metrics';
 import { createWinstonConsoleTransport } from './common/logging/winston.console';
@@ -34,6 +35,7 @@ import { createWinstonConsoleTransport } from './common/logging/winston.console'
     WorkspaceModule,
     NodeModule,
     EdgeModule,
+    MeetModule,
     UploadModule,
     MetricsModule
   ],
