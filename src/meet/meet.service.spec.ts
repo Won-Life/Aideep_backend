@@ -8,7 +8,14 @@ describe('MeetService', () => {
 
   const VALID_JSON = JSON.stringify({
     title: '회의 제목',
-    sections: [{ title: '결정사항', items: ['항목1', '항목2'] }]
+    topics: [
+      {
+        title: '배포 일정',
+        items: ['항목1'],
+        subtopics: [{ title: '롤백 전략', items: ['항목2'] }]
+      }
+    ],
+    decisions: ['금요일 배포 확정']
   });
 
   const ok = (content: string) =>
@@ -47,7 +54,9 @@ describe('MeetService', () => {
     const result = await service.structure('자막');
 
     expect(result.structured).toEqual(JSON.parse(VALID_JSON));
-    expect(result.text).toBe('# 회의 제목\n\n## 결정사항\n- 항목1\n- 항목2');
+    expect(result.text).toBe(
+      '# 배포 일정\n- 항목1\n## 롤백 전략\n- 항목2\n\n# 결정사항\n- 금요일 배포 확정'
+    );
   });
 
   it('<think> 태그와 코드펜스가 감싼 응답도 파싱한다', async () => {
@@ -103,25 +112,34 @@ describe('MeetService', () => {
 
   it('작은따옴표·trailing comma가 섞인 JSON도 복구해 파싱한다', async () => {
     fetchMock.mockResolvedValueOnce(
-      ok(
-        "{ title: '회의 제목', sections: [{ title: '결정사항', items: ['항목1', '항목2',], },], }"
-      )
-    );
-
-    const result = await service.structure('자막');
-
-    expect(result.structured).toEqual(JSON.parse(VALID_JSON));
-  });
-
-  it('중간에서 잘린(truncated) JSON도 복구해 파싱한다', async () => {
-    fetchMock.mockResolvedValueOnce(
-      ok('{"title": "회의 제목", "sections": [{"title": "결정사항", "items": ["항목1')
+      ok("{ title: '회의 제목', topics: [{ title: '배포 일정', items: ['항목1',], },], }")
     );
 
     const result = await service.structure('자막');
 
     expect(result.structured.title).toBe('회의 제목');
-    expect(result.structured.sections[0].items).toEqual(['항목1']);
+    expect(result.structured.topics[0].items).toEqual(['항목1']);
+  });
+
+  it('중간에서 잘린(truncated) JSON도 복구해 파싱한다', async () => {
+    fetchMock.mockResolvedValueOnce(
+      ok('{"title": "회의 제목", "topics": [{"title": "배포 일정", "items": ["항목1')
+    );
+
+    const result = await service.structure('자막');
+
+    expect(result.structured.title).toBe('회의 제목');
+    expect(result.structured.topics[0].items).toEqual(['항목1']);
+  });
+
+  it('knownTopics를 주면 system 프롬프트에 기존 주제 목록을 포함한다', async () => {
+    fetchMock.mockResolvedValueOnce(ok(VALID_JSON));
+
+    await service.structure('자막', ['배포 일정', '온보딩 개선']);
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(body.messages[0].content).toContain('"배포 일정"');
+    expect(body.messages[0].content).toContain('"온보딩 개선"');
   });
 
   it('요청 body에 response_format과 max_tokens 4096을 포함한다', async () => {
