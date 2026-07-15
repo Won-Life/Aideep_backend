@@ -93,10 +93,13 @@ export class AuthService {
   }
 
   async login(user: JwtPayload) {
+    // 로그인마다 새 세션(sid) 발급 — 웹·익스텐션 등 기기별로 refresh 토큰이 독립 관리된다
+    const sid = crypto.randomUUID();
     const payload = {
       userName: user.userName,
       email: user.email,
-      user_id: user.user_id
+      user_id: user.user_id,
+      sid
     };
 
     const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
@@ -104,7 +107,7 @@ export class AuthService {
 
     await this.redisService
       .getClient()
-      .set(REDIS_KEYS.REFRESH_TOKEN(user.user_id), refreshToken, {
+      .set(REDIS_KEYS.REFRESH_TOKEN(user.user_id, sid), refreshToken, {
         EX: 60 * 60 * 24 * 7
       });
 
@@ -121,17 +124,25 @@ export class AuthService {
 
     const redis = this.redisService.getClient();
 
-    const stored = await redis.get(REDIS_KEYS.REFRESH_TOKEN(payload.user_id));
-    if (!stored || stored !== refreshToken) {
-      throw new UnauthorizedException(
-        '만료되거나 이미 사용된 refresh token입니다.'
-      );
+    // 멀티 세션 전환 이전에 발급된 토큰(sid 없음)은 새 키 체계로 조회 불가 — 재로그인 유도
+    if (!payload.sid) {
+      throw new UnauthorizedException('유효하지 않은 refresh token입니다.');
     }
 
+    // 세션 검증: 로그아웃(키 삭제)이나 회전으로 무효화된 구 토큰은 여기서 거부
+    const stored = await redis.get(
+      REDIS_KEYS.REFRESH_TOKEN(payload.user_id, payload.sid)
+    );
+    if (stored !== refreshToken) {
+      throw new UnauthorizedException('유효하지 않은 refresh token입니다.');
+    }
+
+    // 회전: 같은 sid를 유지한 채 새 토큰 쌍 발급 — 세션당 Redis 키 1개가 덮어써진다
     const newPayload = {
       userName: payload.userName,
       email: payload.email,
-      user_id: payload.user_id
+      user_id: payload.user_id,
+      sid: payload.sid
     };
     const newAccessToken = this.jwtService.sign(newPayload, {
       expiresIn: '15m'
@@ -141,7 +152,7 @@ export class AuthService {
     });
 
     await redis.set(
-      REDIS_KEYS.REFRESH_TOKEN(payload.user_id),
+      REDIS_KEYS.REFRESH_TOKEN(payload.user_id, payload.sid),
       newRefreshToken,
       {
         EX: 60 * 60 * 24 * 7
@@ -151,9 +162,12 @@ export class AuthService {
     return { accessToken: newAccessToken, refreshToken: newRefreshToken };
   }
 
-  async logout(userId: string, accessToken: string) {
+  async logout(userId: string, accessToken: string, sid?: string) {
     const redis = this.redisService.getClient();
-    await redis.del(REDIS_KEYS.REFRESH_TOKEN(userId));
+    // 현재 세션의 refresh 토큰만 폐기 — 다른 기기(웹/익스텐션) 세션은 유지
+    if (sid) {
+      await redis.del(REDIS_KEYS.REFRESH_TOKEN(userId, sid));
+    }
     await redis.set(REDIS_KEYS.BLACKLIST(accessToken), '1', { EX: 60 * 15 });
     return '로그아웃 성공';
   }

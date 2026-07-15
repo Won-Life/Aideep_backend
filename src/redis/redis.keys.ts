@@ -2,7 +2,8 @@ export const REDIS_KEYS = {
   AUTH_CODE: (email: string) => `auth:${email}`,
   VERIFIED: (email: string) => `verified:${email}`,
   BLOCK: (phone: string) => `block:${phone}`,
-  REFRESH_TOKEN: (userId: string) => `refreshToken:${userId}`,
+  // 세션(sid)별 키 — 유저당 여러 기기(웹·익스텐션) 동시 로그인 지원
+  REFRESH_TOKEN: (userId: string, sid: string) => `refreshToken:${userId}:${sid}`,
   MASTER_TOKEN: (userId: string) => `masterToken:${userId}`,
   BLACKLIST: (accessToken: string | undefined) => `blacklist:${accessToken}`,
   WORKSPACE_SYNC: (workspaceId: string) => `workspace:sync:${workspaceId}`,

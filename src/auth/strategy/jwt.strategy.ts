@@ -10,6 +10,8 @@ type BaseJwtPayload = {
   userName: string;
   email: string;
   user_id: string;
+  /** 세션 ID — 로그인마다 발급. 기기(웹·익스텐션)별 refresh 토큰을 구분한다. */
+  sid?: string;
 };
 
 export type UserJwtPayload = BaseJwtPayload & { isMaster?: false };
