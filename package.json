@@ -41,6 +41,7 @@
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",
+    "jsonrepair": "3.15.0",
     "lib0": "^0.2.117",
     "multer": "2.1.1",
     "nest-winston": "^1.10.2",

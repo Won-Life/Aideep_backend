@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { jsonrepair } from 'jsonrepair';
 import { BasicError } from 'src/common/error';
 import { StructuredNoteDto, StructureResponseDto } from './dto/structure.dto';
 
@@ -48,35 +49,47 @@ export class MeetService {
 
     for (let i = 0; i < keys.length; i++) {
       const keyIndex = (start + i) % keys.length;
+      let content: unknown;
       try {
-        const res = await fetch(NVIDIA_URL, {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            authorization: `Bearer ${keys[keyIndex]}`
-          },
-          body: JSON.stringify({
-            model: MODEL,
-            max_tokens: 2048,
-            temperature: 0.1,
-            messages: [
-              { role: 'system', content: SYSTEM },
-              { role: 'user', content: transcript }
-            ]
-          })
-        });
+        let res = await this.callNvidia(keys[keyIndex], transcript, true);
+        if (res.status === 400) {
+          // 모델이 response_format 미지원일 수 있으니 같은 키로 미포함 재요청
+          this.logger.warn(
+            `NVIDIA API HTTP 400 (key #${keyIndex}) — response_format 없이 재시도`
+          );
+          res = await this.callNvidia(keys[keyIndex], transcript, false);
+        }
         if (!res.ok) {
           // 429/5xx뿐 아니라 401 등 키별 상태인 4xx도 다음 키로 회전
           this.logger.warn(`NVIDIA API HTTP ${res.status} (key #${keyIndex})`);
           continue;
         }
         const data = await res.json();
-        const structured = this.parseContent(
-          data?.choices?.[0]?.message?.content
-        );
-        return { structured, text: this.toMarkdown(structured) };
+        if (data?.choices?.[0]?.finish_reason === 'length') {
+          this.logger.warn(
+            'NVIDIA 응답이 max_tokens에 도달해 잘렸을 수 있습니다 (finish_reason=length)'
+          );
+        }
+        content = data?.choices?.[0]?.message?.content;
       } catch (err) {
         this.logger.warn(`NVIDIA 호출 실패 (key #${keyIndex}): ${err}`);
+        continue;
+      }
+
+      // 파싱 실패는 키 문제가 아니므로 회전하지 않고 즉시 502로 끊는다
+      try {
+        const structured = this.parseContent(content);
+        return { structured, text: this.toMarkdown(structured) };
+      } catch (err) {
+        const preview =
+          typeof content === 'string' ? content.slice(0, 200) : String(content);
+        this.logger.warn(`LLM 응답 파싱 실패: ${err} — raw: ${preview}`);
+        throw new BasicError(
+          502,
+          'MEET-502',
+          '회의록 구조화 요청이 실패했습니다.',
+          'LLM 응답 JSON 파싱에 실패했습니다.'
+        );
       }
     }
 
@@ -88,6 +101,30 @@ export class MeetService {
     );
   }
 
+  private callNvidia(
+    key: string,
+    transcript: string,
+    jsonMode: boolean
+  ): Promise<Response> {
+    return fetch(NVIDIA_URL, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${key}`
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 4096,
+        temperature: 0.1,
+        ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
+        messages: [
+          { role: 'system', content: SYSTEM },
+          { role: 'user', content: transcript }
+        ]
+      })
+    });
+  }
+
   private parseContent(raw: unknown): StructuredNoteDto {
     if (typeof raw !== 'string') {
       throw new Error('LLM 응답에 content가 없습니다.');
@@ -96,7 +133,15 @@ export class MeetService {
       .replace(/<think>[\s\S]*?<\/think>/g, '') // reasoning 태그 제거
       .replace(/^```(?:json)?\s*|\s*```$/g, '') // 코드펜스 제거
       .trim();
-    const parsed = JSON.parse(cleaned);
+    let parsed;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch {
+      // 비표준 JSON(작은따옴표·trailing comma·truncation) 복구 재시도
+      const braceIdx = cleaned.indexOf('{');
+      const sliced = braceIdx >= 0 ? cleaned.slice(braceIdx) : cleaned;
+      parsed = JSON.parse(jsonrepair(sliced));
+    }
     if (typeof parsed?.title !== 'string' || !Array.isArray(parsed?.sections)) {
       throw new Error('LLM 응답이 회의록 스키마와 일치하지 않습니다.');
     }
