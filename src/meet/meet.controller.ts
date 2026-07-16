@@ -23,6 +23,6 @@ export class MeetController {
   @ApiErrorResponse(500, '서버 설정 오류가 발생했습니다.')
   @ApiErrorResponse(502, '회의록 구조화 요청이 실패했습니다.')
   async structure(@Body() body: StructureBody): Promise<StructureResponseDto> {
-    return await this.meetService.structure(body.transcript, body.knownTopics);
+    return await this.meetService.structure(body.transcript);
   }
 }
