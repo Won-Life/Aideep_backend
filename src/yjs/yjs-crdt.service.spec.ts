@@ -139,10 +139,12 @@ describe('YjsCrdtService', () => {
       expect(result).not.toBeNull();
       expect(result!.state).not.toBeNull();
 
-      // Verify the migrated state contains the markdown
+      // 이슈 #71: 평문이 아니라 Lexical @lexical/yjs 포맷(구조화된 트리)이어야 한다
       const doc = new Y.Doc();
       Y.applyUpdate(doc, new Uint8Array(result!.state!));
-      expect(doc.get('root', Y.XmlText).toString()).toBe('# Title\nSome text');
+      const root = doc.get('root', Y.XmlText);
+      expect(typeof root.toDelta()[0]?.insert).not.toBe('string'); // 평문 아님(구조화됨)
+      expect(root.toString()).not.toBe('# Title\nSome text'); // 원문 그대로가 아님
       doc.destroy();
     });
 
