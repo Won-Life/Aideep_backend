@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import * as Y from 'yjs';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { RedisService } from 'src/redis/redis.service';
 import { REDIS_KEYS } from 'src/redis/redis.keys';
 import { Transactional } from 'src/prisma/transactional.decorator';
 import { FileAttachmentService } from 'src/file-attachment/file-attachment.service';
+import { markdownToYjsUpdate } from './markdown-yjs';
 
 @Injectable()
 export class YjsCrdtService {
@@ -62,11 +62,8 @@ export class YjsCrdtService {
     const markdownBody = content?.markdownBody;
 
     if (markdownBody && typeof markdownBody === 'string') {
-      const doc = new Y.Doc();
-      const xmlText = doc.get('root', Y.XmlText);
-      xmlText.insert(0, markdownBody);
-      const state = Buffer.from(Y.encodeStateAsUpdate(doc));
-      doc.destroy();
+      // markdownBody를 Lexical @lexical/yjs 바인딩 포맷으로 변환 (평문 삽입은 에디터가 못 읽음 — 이슈 #71)
+      const state = Buffer.from(markdownToYjsUpdate(markdownBody));
       return { state, workspaceId: node.workspace_id };
     }
 
