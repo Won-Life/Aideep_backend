@@ -8,8 +8,14 @@ describe('MeetService', () => {
 
   const VALID_JSON = JSON.stringify({
     title: '회의 제목',
-    sections: [{ title: '결정사항', items: ['항목1', '항목2'] }]
+    points: [
+      { subtopicId: null, newSubtopicTitle: '롤백 전략', title: '즉시 롤백', detail: '실패 시 즉시 롤백' }
+    ],
+    decisions: ['항목1']
   });
+
+  const VALID_TEXT =
+    '# 회의 제목\n\n# 주제\n\n## 롤백 전략\n- 즉시 롤백: 실패 시 즉시 롤백\n\n# 결정사항\n- 항목1';
 
   const ok = (content: string) =>
     ({
@@ -24,6 +30,10 @@ describe('MeetService', () => {
   const authHeaderOfCall = (callIndex: number) =>
     (fetchMock.mock.calls[callIndex][1].headers as Record<string, string>)
       .authorization;
+
+  const systemPromptOfCall = (callIndex: number) =>
+    JSON.parse(fetchMock.mock.calls[callIndex][1].body as string).messages[0]
+      .content as string;
 
   beforeEach(async () => {
     process.env.NVIDIA_API_KEYS = 'k1,k2,k3';
@@ -47,7 +57,7 @@ describe('MeetService', () => {
     const result = await service.structure('자막');
 
     expect(result.structured).toEqual(JSON.parse(VALID_JSON));
-    expect(result.text).toBe('# 회의 제목\n\n## 결정사항\n- 항목1\n- 항목2');
+    expect(result.text).toBe(VALID_TEXT);
   });
 
   it('<think> 태그와 코드펜스가 감싼 응답도 파싱한다', async () => {
@@ -101,27 +111,43 @@ describe('MeetService', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('points가 배열이 아니면(구 스키마 응답) 즉시 502를 던진다', async () => {
+    fetchMock.mockResolvedValueOnce(
+      ok(JSON.stringify({ title: '회의 제목', sections: [] }))
+    );
+
+    await expect(service.structure('자막')).rejects.toMatchObject({
+      status: 502
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('작은따옴표·trailing comma가 섞인 JSON도 복구해 파싱한다', async () => {
     fetchMock.mockResolvedValueOnce(
       ok(
-        "{ title: '회의 제목', sections: [{ title: '결정사항', items: ['항목1', '항목2',], },], }"
+        "{ title: '회의 제목', points: [{ subtopicId: null, newSubtopicTitle: '롤백 전략', title: '즉시 롤백', detail: '실패 시 즉시 롤백', },], }"
       )
     );
 
     const result = await service.structure('자막');
 
-    expect(result.structured).toEqual(JSON.parse(VALID_JSON));
+    expect(result.structured.title).toBe('회의 제목');
+    expect(result.structured.points).toEqual([
+      { subtopicId: null, newSubtopicTitle: '롤백 전략', title: '즉시 롤백', detail: '실패 시 즉시 롤백' }
+    ]);
   });
 
   it('중간에서 잘린(truncated) JSON도 복구해 파싱한다', async () => {
     fetchMock.mockResolvedValueOnce(
-      ok('{"title": "회의 제목", "sections": [{"title": "결정사항", "items": ["항목1')
+      ok(
+        '{"title": "회의 제목", "points": [{"subtopicId": null, "newSubtopicTitle": "롤백 전략", "title": "즉시 롤백", "detail": "실패 시'
+      )
     );
 
     const result = await service.structure('자막');
 
     expect(result.structured.title).toBe('회의 제목');
-    expect(result.structured.sections[0].items).toEqual(['항목1']);
+    expect(result.structured.points[0].detail).toBe('실패 시');
   });
 
   it('요청 body에 response_format과 max_tokens 4096을 포함한다', async () => {
@@ -155,6 +181,22 @@ describe('MeetService', () => {
       status: 500
     });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('knownSubtopics를 시스템 프롬프트에 id·title로 포함한다', async () => {
+    fetchMock.mockResolvedValueOnce(ok(VALID_JSON));
+
+    await service.structure('자막', [{ id: 'st_1', title: '롤백 전략' }]);
+
+    expect(systemPromptOfCall(0)).toContain('id="st_1" title="롤백 전략"');
+  });
+
+  it('knownSubtopics가 없으면 프롬프트에 "없음"이라고 표시한다', async () => {
+    fetchMock.mockResolvedValueOnce(ok(VALID_JSON));
+
+    await service.structure('자막');
+
+    expect(systemPromptOfCall(0)).toContain('없음 — 전부 새 subtopic');
   });
 
   it('should be defined', () => {
