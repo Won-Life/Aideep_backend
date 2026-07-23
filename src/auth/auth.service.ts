@@ -92,23 +92,51 @@ export class AuthService {
     return { masterToken };
   }
 
+  // 사용자당 동시 세션(기기) 상한 — 초과 시 가장 오래된 세션 제거 (#69)
+  private static readonly MAX_REFRESH_SESSIONS = 5;
+
   async login(user: JwtPayload) {
+    // 세션(기기) 식별자 — 로그인마다 새로 발급, access/refresh 양쪽에 포함 (#69)
+    const jti = crypto.randomUUID();
     const payload = {
       userName: user.userName,
       email: user.email,
-      user_id: user.user_id
+      user_id: user.user_id,
+      jti
     };
 
     const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
     const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
 
+    await this.evictSessionsOverLimit(user.user_id);
     await this.redisService
       .getClient()
-      .set(REDIS_KEYS.REFRESH_TOKEN(user.user_id), refreshToken, {
+      .set(REDIS_KEYS.REFRESH_TOKEN(user.user_id, jti), refreshToken, {
         EX: 60 * 60 * 24 * 7
       });
 
     return { accessToken, refreshToken };
+  }
+
+  // 세션 키가 상한 이상이면 TTL이 가장 작은(가장 오래 갱신 안 된) 키부터 삭제
+  private async evictSessionsOverLimit(userId: string) {
+    const redis = this.redisService.getClient();
+    const keys: string[] = [];
+    for await (const batch of redis.scanIterator({
+      MATCH: REDIS_KEYS.REFRESH_TOKEN_PATTERN(userId)
+    })) {
+      keys.push(...batch);
+    }
+    if (keys.length < AuthService.MAX_REFRESH_SESSIONS) return;
+
+    const withTtl = await Promise.all(
+      keys.map(async (key) => ({ key, ttl: await redis.ttl(key) }))
+    );
+    withTtl.sort((a, b) => a.ttl - b.ttl);
+    const removeCount = keys.length - AuthService.MAX_REFRESH_SESSIONS + 1;
+    await Promise.all(
+      withTtl.slice(0, removeCount).map(({ key }) => redis.del(key))
+    );
   }
 
   async refresh(refreshToken: string) {
@@ -119,19 +147,29 @@ export class AuthService {
       throw new UnauthorizedException('유효하지 않은 refresh token입니다.');
     }
 
-    const redis = this.redisService.getClient();
+    // 구(jti 없는) refresh token은 세션 키를 특정할 수 없어 재로그인 유도 (#69)
+    if (!payload.jti) {
+      throw new UnauthorizedException(
+        '만료되거나 이미 사용된 refresh token입니다.'
+      );
+    }
 
-    const stored = await redis.get(REDIS_KEYS.REFRESH_TOKEN(payload.user_id));
+    const redis = this.redisService.getClient();
+    const sessionKey = REDIS_KEYS.REFRESH_TOKEN(payload.user_id, payload.jti);
+
+    const stored = await redis.get(sessionKey);
     if (!stored || stored !== refreshToken) {
       throw new UnauthorizedException(
         '만료되거나 이미 사용된 refresh token입니다.'
       );
     }
 
+    // rotation: 같은 jti(세션) 키만 새 토큰으로 갱신 — 다른 기기 세션에 영향 없음
     const newPayload = {
       userName: payload.userName,
       email: payload.email,
-      user_id: payload.user_id
+      user_id: payload.user_id,
+      jti: payload.jti
     };
     const newAccessToken = this.jwtService.sign(newPayload, {
       expiresIn: '15m'
@@ -140,20 +178,22 @@ export class AuthService {
       expiresIn: '7d'
     });
 
-    await redis.set(
-      REDIS_KEYS.REFRESH_TOKEN(payload.user_id),
-      newRefreshToken,
-      {
-        EX: 60 * 60 * 24 * 7
-      }
-    );
+    await redis.set(sessionKey, newRefreshToken, {
+      EX: 60 * 60 * 24 * 7
+    });
 
     return { accessToken: newAccessToken, refreshToken: newRefreshToken };
   }
 
-  async logout(userId: string, accessToken: string) {
+  async logout(user: JwtPayload, accessToken: string) {
     const redis = this.redisService.getClient();
-    await redis.del(REDIS_KEYS.REFRESH_TOKEN(userId));
+    if (user.jti) {
+      // 현재 세션(기기)만 로그아웃
+      await redis.del(REDIS_KEYS.REFRESH_TOKEN(user.user_id, user.jti));
+    } else {
+      // 구(jti 없는) access token 호환 — 배포 후 15분 내 자연 소멸
+      await redis.del(REDIS_KEYS.REFRESH_TOKEN_LEGACY(user.user_id));
+    }
     await redis.set(REDIS_KEYS.BLACKLIST(accessToken), '1', { EX: 60 * 15 });
     return '로그아웃 성공';
   }

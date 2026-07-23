@@ -135,7 +135,7 @@ export class AuthController {
     const authorization: string = req.headers['authorization'] ?? '';
     const accessToken = authorization.replace('Bearer ', '');
 
-    return this.authService.logout(req.user.user_id, accessToken);
+    return this.authService.logout(req.user, accessToken);
   }
 
   // ─── Google OAuth — 로그인/가입 개시 (login-CSRF 방지: 수동 redirect + state nonce) ──
