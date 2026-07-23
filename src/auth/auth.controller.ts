@@ -31,6 +31,17 @@ import { GoogleAuthGuard } from './guards/google.guard';
 import { OAuthSignupCompleteBody } from './dtos/oauthSignupComplete.dto';
 import { PatchPasswordBody } from './dtos/patchPassword.dto';
 
+// handleGoogleLogin 예외 메시지 → 프론트엔드 리다이렉트 reason 코드 (#75)
+const OAUTH_CALLBACK_ERROR_REASONS: Record<string, string> = {
+  'state 누락': 'invalid_state',
+  '유효하지 않은 state': 'invalid_state',
+  '사용자를 찾을 수 없습니다.': 'user_not_found',
+  '이미 다른 계정에 연동된 Google 계정입니다.': 'google_account_already_linked',
+  '이미 연동된 제공자입니다.': 'provider_already_linked',
+  '이미 가입된 이메일입니다. 이메일/비밀번호 로그인 후 계정을 연동하세요.':
+    'email_conflict'
+};
+
 class RefreshTokenBody {
   @ApiProperty({ example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' })
   @IsString()
@@ -156,10 +167,27 @@ export class AuthController {
   @ApiOperation({
     summary: 'Google OAuth 콜백 (로그인·가입·연동 통합)',
     description:
-      'Google 인증 후 login / signup_required / linked 중 하나를 반환합니다.'
+      'Google 인증 후 결과를 쿼리 파라미터에 실어 {FRONTEND_URL}/oauth/callback 으로 리다이렉트합니다. (#75)'
   })
-  async googleCallback(@Request() req: any) {
-    return this.authService.handleGoogleLogin(req.user);
+  async googleCallback(@Request() req: any, @Res() res: Response) {
+    const callbackUrl = `${process.env.FRONTEND_URL}/oauth/callback`;
+    try {
+      const result = await this.authService.handleGoogleLogin(req.user);
+      const params = new URLSearchParams({ kind: result.kind });
+      if (result.kind === 'login') {
+        params.set('accessToken', result.accessToken);
+        params.set('refreshToken', result.refreshToken);
+      } else if (result.kind === 'signup_required') {
+        params.set('ticket', result.ticket);
+      }
+      res.redirect(`${callbackUrl}?${params.toString()}`);
+    } catch (err) {
+      // 브라우저 풀페이지 이동이므로 전역 필터의 JSON 응답 대신 리다이렉트로 변환 (#75)
+      const reason =
+        (err instanceof Error && OAUTH_CALLBACK_ERROR_REASONS[err.message]) ||
+        'oauth_failed';
+      res.redirect(`${callbackUrl}?kind=error&reason=${reason}`);
+    }
   }
 
   // ─── OAuth 회원가입 2-step complete (D-001, D-016: public) ────────────────
