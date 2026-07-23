@@ -22,7 +22,21 @@ describe('AuthService', () => {
     set: jest.fn(),
     del: jest.fn(),
     getDel: jest.fn(),
+    ttl: jest.fn(),
+    scanIterator: jest.fn(),
   };
+
+  const mockJwtService = {
+    sign: jest.fn().mockReturnValue('mock-token'),
+    verify: jest.fn(),
+  };
+
+  // node-redis v5 scanIterator 는 키 배치(string[]) 단위로 yield 한다
+  const asAsyncIterable = (batches: string[][]) => ({
+    async *[Symbol.asyncIterator]() {
+      for (const batch of batches) yield batch;
+    },
+  });
 
   const mockPrismaClient = {
     users: {
@@ -53,6 +67,7 @@ describe('AuthService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockRedisClient.scanIterator.mockReturnValue(asAsyncIterable([]));
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -79,10 +94,7 @@ describe('AuthService', () => {
         },
         {
           provide: JwtService,
-          useValue: {
-            sign: jest.fn().mockReturnValue('mock-token'),
-            verify: jest.fn(),
-          },
+          useValue: mockJwtService,
         },
         {
           provide: RedisService,
@@ -331,6 +343,117 @@ describe('AuthService', () => {
       await expect(
         service.completeOAuthSignup({ ticket: 't2', username: 'newuser', agreedToTerms: true })
       ).rejects.toThrow(ConflictException);
+    });
+  });
+
+  // ─── #69: 세션(jti)별 refresh token 병존 ─────────────────────────────────
+
+  describe('login — 세션(jti)별 refresh token (#69)', () => {
+    const user = { userName: 'u', email: 'u@e.com', user_id: 'uid-1' } as any;
+
+    it('jti 포함 payload 로 서명하고 세션별 키에 저장, 기존 세션 키는 유지', async () => {
+      mockRedisClient.scanIterator.mockReturnValue(
+        asAsyncIterable([['refreshToken:uid-1:old-jti']])
+      );
+      mockRedisClient.set.mockResolvedValue('OK');
+
+      await service.login(user);
+
+      const payload = mockJwtService.sign.mock.calls[0][0];
+      expect(payload.jti).toBeDefined();
+      // access/refresh 둘 다 같은 jti 로 서명
+      expect(mockJwtService.sign.mock.calls[1][0].jti).toBe(payload.jti);
+      expect(mockRedisClient.set).toHaveBeenCalledWith(
+        `refreshToken:uid-1:${payload.jti}`,
+        'mock-token',
+        { EX: 60 * 60 * 24 * 7 }
+      );
+      expect(mockRedisClient.del).not.toHaveBeenCalled();
+    });
+
+    it('세션이 상한(5개)이면 TTL 최소 키를 삭제 후 저장', async () => {
+      const keys = ['j1', 'j2', 'j3', 'j4', 'j5'].map(
+        (j) => `refreshToken:uid-1:${j}`
+      );
+      mockRedisClient.scanIterator.mockReturnValue(asAsyncIterable([keys]));
+      mockRedisClient.ttl.mockImplementation((key: string) =>
+        Promise.resolve(key.endsWith('j3') ? 100 : 1000)
+      );
+      mockRedisClient.set.mockResolvedValue('OK');
+
+      await service.login(user);
+
+      expect(mockRedisClient.del).toHaveBeenCalledTimes(1);
+      expect(mockRedisClient.del).toHaveBeenCalledWith('refreshToken:uid-1:j3');
+    });
+  });
+
+  describe('refresh — 세션(jti)별 rotation (#69)', () => {
+    const basePayload = { userName: 'u', email: 'u@e.com', user_id: 'uid-1' };
+
+    it('jti 없는 구 refresh token → UnauthorizedException', async () => {
+      mockJwtService.verify.mockReturnValue({ ...basePayload });
+
+      await expect(service.refresh('legacy-token')).rejects.toThrow(
+        UnauthorizedException
+      );
+      expect(mockRedisClient.get).not.toHaveBeenCalled();
+    });
+
+    it('저장값 불일치 → UnauthorizedException', async () => {
+      mockJwtService.verify.mockReturnValue({ ...basePayload, jti: 'j1' });
+      mockRedisClient.get.mockResolvedValue('other-token');
+
+      await expect(service.refresh('my-token')).rejects.toThrow(
+        UnauthorizedException
+      );
+    });
+
+    it('정상 rotation 은 같은 jti 키만 갱신', async () => {
+      mockJwtService.verify.mockReturnValue({ ...basePayload, jti: 'j1' });
+      mockRedisClient.get.mockResolvedValue('my-token');
+      mockRedisClient.set.mockResolvedValue('OK');
+
+      const result = await service.refresh('my-token');
+
+      expect(mockRedisClient.get).toHaveBeenCalledWith('refreshToken:uid-1:j1');
+      expect(mockJwtService.sign.mock.calls[0][0].jti).toBe('j1');
+      expect(mockRedisClient.set).toHaveBeenCalledWith(
+        'refreshToken:uid-1:j1',
+        'mock-token',
+        { EX: 60 * 60 * 24 * 7 }
+      );
+      expect(result).toEqual({
+        accessToken: 'mock-token',
+        refreshToken: 'mock-token',
+      });
+    });
+  });
+
+  describe('logout — 현재 세션만 로그아웃 (#69)', () => {
+    it('jti 있으면 해당 세션 키만 삭제', async () => {
+      const result = await service.logout(
+        { userName: 'u', email: 'u@e.com', user_id: 'uid-1', jti: 'j1' } as any,
+        'access-token'
+      );
+
+      expect(mockRedisClient.del).toHaveBeenCalledTimes(1);
+      expect(mockRedisClient.del).toHaveBeenCalledWith('refreshToken:uid-1:j1');
+      expect(mockRedisClient.set).toHaveBeenCalledWith(
+        'blacklist:access-token',
+        '1',
+        { EX: 60 * 15 }
+      );
+      expect(result).toBe('로그아웃 성공');
+    });
+
+    it('jti 없는 구 access token 이면 레거시 단일 키 삭제', async () => {
+      await service.logout(
+        { userName: 'u', email: 'u@e.com', user_id: 'uid-1' } as any,
+        'access-token'
+      );
+
+      expect(mockRedisClient.del).toHaveBeenCalledWith('refreshToken:uid-1');
     });
   });
 });
