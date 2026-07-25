@@ -1,3 +1,4 @@
+import { ConflictException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -96,6 +97,86 @@ describe('AuthController', () => {
 
       expect(authService.initiateOAuthLogin).toHaveBeenCalled();
       expect(mockRes.redirect).toHaveBeenCalledWith(mockUrl);
+    });
+  });
+
+  // ─── GET /google/callback — 프론트엔드 리다이렉트 (#75) ─────────────────
+
+  describe('GET /google/callback', () => {
+    const FRONTEND_URL = 'http://localhost:3000';
+
+    beforeEach(() => {
+      process.env.FRONTEND_URL = FRONTEND_URL;
+    });
+
+    it('login: 토큰을 쿼리 파라미터에 실어 리다이렉트한다', async () => {
+      jest.spyOn(authService, 'handleGoogleLogin').mockResolvedValue({
+        kind: 'login',
+        accessToken: 'access-1',
+        refreshToken: 'refresh-1',
+      });
+      const mockRes = { redirect: jest.fn() } as any;
+
+      await controller.googleCallback({ user: {} }, mockRes);
+
+      expect(mockRes.redirect).toHaveBeenCalledWith(
+        `${FRONTEND_URL}/oauth/callback?kind=login&accessToken=access-1&refreshToken=refresh-1`
+      );
+    });
+
+    it('signup_required: ticket 을 쿼리 파라미터에 실어 리다이렉트한다', async () => {
+      jest.spyOn(authService, 'handleGoogleLogin').mockResolvedValue({
+        kind: 'signup_required',
+        ticket: 'ticket-1',
+      });
+      const mockRes = { redirect: jest.fn() } as any;
+
+      await controller.googleCallback({ user: {} }, mockRes);
+
+      expect(mockRes.redirect).toHaveBeenCalledWith(
+        `${FRONTEND_URL}/oauth/callback?kind=signup_required&ticket=ticket-1`
+      );
+    });
+
+    it('linked: kind 만 실어 리다이렉트한다', async () => {
+      jest.spyOn(authService, 'handleGoogleLogin').mockResolvedValue({
+        kind: 'linked',
+      });
+      const mockRes = { redirect: jest.fn() } as any;
+
+      await controller.googleCallback({ user: {} }, mockRes);
+
+      expect(mockRes.redirect).toHaveBeenCalledWith(
+        `${FRONTEND_URL}/oauth/callback?kind=linked`
+      );
+    });
+
+    it('알려진 예외는 reason 코드로 변환해 리다이렉트한다', async () => {
+      jest.spyOn(authService, 'handleGoogleLogin').mockRejectedValue(
+        new ConflictException(
+          '이미 가입된 이메일입니다. 이메일/비밀번호 로그인 후 계정을 연동하세요.'
+        )
+      );
+      const mockRes = { redirect: jest.fn() } as any;
+
+      await controller.googleCallback({ user: {} }, mockRes);
+
+      expect(mockRes.redirect).toHaveBeenCalledWith(
+        `${FRONTEND_URL}/oauth/callback?kind=error&reason=email_conflict`
+      );
+    });
+
+    it('알 수 없는 예외는 oauth_failed 로 리다이렉트한다', async () => {
+      jest.spyOn(authService, 'handleGoogleLogin').mockRejectedValue(
+        new Error('unexpected')
+      );
+      const mockRes = { redirect: jest.fn() } as any;
+
+      await controller.googleCallback({ user: {} }, mockRes);
+
+      expect(mockRes.redirect).toHaveBeenCalledWith(
+        `${FRONTEND_URL}/oauth/callback?kind=error&reason=oauth_failed`
+      );
     });
   });
 
