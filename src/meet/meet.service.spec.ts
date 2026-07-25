@@ -202,4 +202,134 @@ describe('MeetService', () => {
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
+
+  describe('structureStream', () => {
+    const enc = new TextEncoder();
+
+    // NVIDIA SSE 응답 mock: chunks를 순서대로 Uint8Array로 흘리고, throwAtEnd면 마지막에 끊김 재현.
+    const sseBody = (chunks: string[], throwAtEnd = false) =>
+      ({
+        ok: true,
+        status: 200,
+        body: (async function* () {
+          for (const c of chunks) yield enc.encode(c);
+          if (throwAtEnd) throw new Error('stream reset');
+        })()
+      }) as unknown as Response;
+
+    const dataFrame = (content: string) =>
+      `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\n`;
+
+    const DONE = 'data: [DONE]\n\n';
+
+    const collect = async (gen: AsyncGenerator<any>) => {
+      const out: any[] = [];
+      for await (const e of gen) out.push(e);
+      return out;
+    };
+
+    it('스트림 조각을 누적해 파싱하고 token들과 result를 낸다', async () => {
+      const mid = Math.floor(VALID_JSON.length / 2);
+      fetchMock.mockResolvedValueOnce(
+        sseBody([
+          dataFrame(VALID_JSON.slice(0, mid)),
+          dataFrame(VALID_JSON.slice(mid)),
+          DONE
+        ])
+      );
+
+      const events = await collect(service.structureStream('자막'));
+
+      const tokens = events.filter((e) => e.type === 'token');
+      expect(tokens).toHaveLength(2);
+      expect(tokens.map((t) => t.token).join('')).toBe(VALID_JSON);
+      const result = events.find((e) => e.type === 'result');
+      expect(result.structured.title).toBe('회의 제목');
+      expect(result.text).toBe(VALID_TEXT);
+    });
+
+    it('요청 body에 stream:true를 포함한다', async () => {
+      fetchMock.mockResolvedValueOnce(sseBody([dataFrame(VALID_JSON), DONE]));
+
+      await collect(service.structureStream('자막'));
+
+      const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+      expect(body.stream).toBe(true);
+    });
+
+    it('첫 토큰 이후 스트림이 끊기면 token 뒤에 error를 내고 result는 없다', async () => {
+      fetchMock.mockResolvedValueOnce(
+        sseBody([dataFrame('{"title":')], true)
+      );
+
+      const events = await collect(service.structureStream('자막'));
+
+      expect(events[0].type).toBe('token');
+      expect(events[events.length - 1]).toMatchObject({
+        type: 'error',
+        errorCode: 'MEET-502'
+      });
+      expect(events.some((e) => e.type === 'result')).toBe(false);
+    });
+
+    it('첫 토큰 이전 실패면 다음 키로 회전해 성공한다', async () => {
+      fetchMock
+        .mockResolvedValueOnce(fail(429))
+        .mockResolvedValueOnce(sseBody([dataFrame(VALID_JSON), DONE]));
+
+      const events = await collect(service.structureStream('자막'));
+
+      expect(events.find((e) => e.type === 'result').structured.title).toBe(
+        '회의 제목'
+      );
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(authHeaderOfCall(0)).toBe('Bearer k1');
+      expect(authHeaderOfCall(1)).toBe('Bearer k2');
+    });
+
+    it('모든 키가 실패하면 단일 error 이벤트를 낸다', async () => {
+      fetchMock.mockResolvedValue(fail(500));
+
+      const events = await collect(service.structureStream('자막'));
+
+      expect(events).toEqual([
+        {
+          type: 'error',
+          errorCode: 'MEET-502',
+          reason: '회의록 구조화 요청이 실패했습니다.'
+        }
+      ]);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    });
+
+    it('HTTP 400이면 같은 키로 response_format 없이(stream 유지) 재요청한다', async () => {
+      fetchMock
+        .mockResolvedValueOnce(fail(400))
+        .mockResolvedValueOnce(sseBody([dataFrame(VALID_JSON), DONE]));
+
+      const events = await collect(service.structureStream('자막'));
+
+      expect(events.find((e) => e.type === 'result')).toBeDefined();
+      expect(authHeaderOfCall(0)).toBe('Bearer k1');
+      expect(authHeaderOfCall(1)).toBe('Bearer k1');
+      const retryBody = JSON.parse(fetchMock.mock.calls[1][1].body as string);
+      expect(retryBody.response_format).toBeUndefined();
+      expect(retryBody.stream).toBe(true);
+    });
+
+    it('NVIDIA_API_KEYS가 없으면 fetch 없이 error 이벤트(MEET-500)를 낸다', async () => {
+      delete process.env.NVIDIA_API_KEYS;
+
+      const events = await collect(service.structureStream('자막'));
+
+      expect(events).toEqual([
+        {
+          type: 'error',
+          errorCode: 'MEET-500',
+          reason: '서버 설정 오류가 발생했습니다.'
+        }
+      ]);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
 });
