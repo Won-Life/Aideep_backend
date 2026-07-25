@@ -11,6 +11,12 @@ const NVIDIA_URL = 'https://integrate.api.nvidia.com/v1/chat/completions';
 // 모델 교체는 이 상수만 수정 — build.nvidia.com 모델 카드의 ID 그대로 사용
 const MODEL = 'z-ai/glm-5.2';
 
+// SSE 스트림으로 흘려보내는 이벤트. 컨트롤러가 이 유니온을 그대로 SSE 프레임으로 직렬화한다.
+export type StructureStreamEvent =
+  | { type: 'token'; token: string }
+  | { type: 'result'; structured: StructuredNoteDto; text: string }
+  | { type: 'error'; errorCode: string; reason: string };
+
 function buildSystemPrompt(knownSubtopics: KnownSubtopicDto[]): string {
   const knownList = knownSubtopics.length
     ? knownSubtopics.map((s) => `  - id="${s.id}" title="${s.title}"`).join('\n')
@@ -130,14 +136,159 @@ export class MeetService {
     );
   }
 
+  // 동기 structure()의 스트리밍 버전. NVIDIA stream:true 응답을 토큰 조각으로 흘리고
+  // 누적 완료 후 기존 parseContent/toMarkdown로 최종 result를 만든다. 실패는 throw하지 않고
+  // error 이벤트로 yield한다 — 컨트롤러가 이미 SSE 헤더를 보낸 뒤라 throw할 수 없기 때문.
+  async *structureStream(
+    transcript: string,
+    knownSubtopics: KnownSubtopicDto[] = [],
+    signal?: AbortSignal
+  ): AsyncGenerator<StructureStreamEvent> {
+    const keys = (process.env.NVIDIA_API_KEYS ?? '')
+      .split(',')
+      .map((k) => k.trim())
+      .filter(Boolean);
+    if (keys.length === 0) {
+      this.logger.error('NVIDIA_API_KEYS 환경변수가 설정되지 않았습니다.');
+      yield {
+        type: 'error',
+        errorCode: 'MEET-500',
+        reason: '서버 설정 오류가 발생했습니다.'
+      };
+      return;
+    }
+
+    const start = this.nextKeyIndex;
+    this.nextKeyIndex = (this.nextKeyIndex + 1) % keys.length;
+
+    for (let i = 0; i < keys.length; i++) {
+      const keyIndex = (start + i) % keys.length;
+      let res: Response;
+      try {
+        res = await this.callNvidia(
+          keys[keyIndex],
+          transcript,
+          knownSubtopics,
+          true,
+          true,
+          signal
+        );
+        if (res.status === 400) {
+          // 모델이 response_format+stream 동시 미지원일 수 있으니 같은 키로 미포함 재요청
+          this.logger.warn(
+            `NVIDIA stream HTTP 400 (key #${keyIndex}) — response_format 없이 재시도`
+          );
+          res = await this.callNvidia(
+            keys[keyIndex],
+            transcript,
+            knownSubtopics,
+            false,
+            true,
+            signal
+          );
+        }
+        if (!res.ok) {
+          this.logger.warn(`NVIDIA stream HTTP ${res.status} (key #${keyIndex})`);
+          continue;
+        }
+      } catch (err) {
+        if (signal?.aborted) return;
+        this.logger.warn(`NVIDIA stream 호출 실패 (key #${keyIndex}): ${err}`);
+        continue; // 첫 토큰 이전 실패 → 다음 키로 회전
+      }
+
+      let content = '';
+      let sawDelta = false;
+      try {
+        for await (const piece of this.readNvidiaStream(res)) {
+          content += piece;
+          sawDelta = true;
+          yield { type: 'token', token: piece };
+        }
+      } catch (err) {
+        if (signal?.aborted) return;
+        if (!sawDelta) {
+          // 첫 토큰 이전에 끊겼으면 키 문제일 수 있으니 다음 키로 회전
+          this.logger.warn(`NVIDIA stream 조기 종료 (key #${keyIndex}): ${err}`);
+          continue;
+        }
+        // 토큰을 이미 흘린 뒤의 중단은 회전하지 않고 error 이벤트로 종료
+        this.logger.warn(`NVIDIA stream 중단: ${err}`);
+        yield {
+          type: 'error',
+          errorCode: 'MEET-502',
+          reason: '회의록 구조화 요청이 실패했습니다.'
+        };
+        return;
+      }
+
+      try {
+        const structured = this.parseContent(content);
+        yield {
+          type: 'result',
+          structured,
+          text: this.toMarkdown(structured, knownSubtopics)
+        };
+        return;
+      } catch (err) {
+        this.logger.warn(
+          `LLM 스트림 응답 파싱 실패: ${err} — raw: ${content.slice(0, 200)}`
+        );
+        yield {
+          type: 'error',
+          errorCode: 'MEET-502',
+          reason: '회의록 구조화 요청이 실패했습니다.'
+        };
+        return;
+      }
+    }
+
+    yield {
+      type: 'error',
+      errorCode: 'MEET-502',
+      reason: '회의록 구조화 요청이 실패했습니다.'
+    };
+  }
+
+  // NVIDIA(OpenAI 호환) SSE 응답을 파싱해 delta.content 조각을 yield한다.
+  // data: {...} 프레임을 \n\n 경계로 나눠 누적하고 data: [DONE]에서 종료.
+  private async *readNvidiaStream(res: Response): AsyncGenerator<string> {
+    if (!res.body) throw new Error('NVIDIA 응답에 body가 없습니다.');
+    const decoder = new TextDecoder();
+    let buffer = '';
+    for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
+      buffer += decoder.decode(chunk, { stream: true });
+      let idx: number;
+      while ((idx = buffer.indexOf('\n\n')) !== -1) {
+        const frame = buffer.slice(0, idx);
+        buffer = buffer.slice(idx + 2);
+        for (const line of frame.split('\n')) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data:')) continue;
+          const payload = trimmed.slice(5).trim();
+          if (payload === '[DONE]') return;
+          try {
+            const piece = JSON.parse(payload)?.choices?.[0]?.delta?.content;
+            if (typeof piece === 'string' && piece.length) yield piece;
+          } catch {
+            // keep-alive 주석·부분 프레임은 무시
+          }
+        }
+      }
+    }
+  }
+
   private callNvidia(
     key: string,
     transcript: string,
     knownSubtopics: KnownSubtopicDto[],
-    jsonMode: boolean
+    jsonMode: boolean,
+    stream = false,
+    signal?: AbortSignal
   ): Promise<Response> {
     return fetch(NVIDIA_URL, {
       method: 'POST',
+      signal,
       headers: {
         'content-type': 'application/json',
         authorization: `Bearer ${key}`
@@ -147,6 +298,7 @@ export class MeetService {
         max_tokens: 4096,
         temperature: 0.1,
         ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
+        ...(stream ? { stream: true } : {}),
         messages: [
           { role: 'system', content: buildSystemPrompt(knownSubtopics) },
           { role: 'user', content: transcript }
