@@ -15,6 +15,7 @@ import { NodeModule } from './node/node.module';
 import { WinstonModule } from 'nest-winston';
 import { EdgeModule } from './edge/edge.module';
 import { UploadModule } from './upload/upload.module';
+import { AiModule } from './ai/ai.module';
 import { MetricsModule } from './common/metrics';
 import { createWinstonConsoleTransport } from './common/logging/winston.console';
 
@@ -33,6 +34,7 @@ import { createWinstonConsoleTransport } from './common/logging/winston.console'
     NodeModule,
     EdgeModule,
     UploadModule,
+    AiModule,
     MetricsModule
   ],
   controllers: [AppController],
