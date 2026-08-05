@@ -1,6 +1,7 @@
 import { Injectable, OnModuleDestroy, Logger } from '@nestjs/common';
 import * as Y from 'yjs';
 import { YjsCrdtService } from './yjs-crdt.service';
+import { EmbedQueueService } from 'src/redis/embed-queue.service';
 import {
   DEBOUNCE_SAVE_MS,
   SAFETY_FLUSH_INTERVAL_MS,
@@ -14,6 +15,10 @@ interface ManagedDoc {
   saveTimer: ReturnType<typeof setTimeout> | null;
   idleTimer: ReturnType<typeof setTimeout> | null;
   lastActivity: number;
+  /** 마지막 flush 이후 실제 편집이 있었는지 (세이프티 플러시의 불필요한 재임베딩 방지) */
+  dirtyForEmbed: boolean;
+  /** 재임베딩 job에 실어보낼, 마지막으로 편집한 사용자 */
+  lastEditorUserId: string | null;
 }
 
 @Injectable()
@@ -24,7 +29,10 @@ export class YjsDocManager implements OnModuleDestroy {
 
   private flushInterval: ReturnType<typeof setInterval>;
 
-  constructor(private readonly crdtService: YjsCrdtService) {
+  constructor(
+    private readonly crdtService: YjsCrdtService,
+    private readonly embedQueueService: EmbedQueueService
+  ) {
     this.flushInterval = setInterval(
       () => this.flushAll(),
       SAFETY_FLUSH_INTERVAL_MS
@@ -89,7 +97,9 @@ export class YjsDocManager implements OnModuleDestroy {
       workspaceId,
       saveTimer: null,
       idleTimer: null,
-      lastActivity: Date.now()
+      lastActivity: Date.now(),
+      dirtyForEmbed: false,
+      lastEditorUserId: null
     });
 
     return doc;
@@ -128,20 +138,22 @@ export class YjsDocManager implements OnModuleDestroy {
 
   // ── Update 적용 ──────────────────────────────────────────────
 
-  applyUpdate(nodeId: string, update: Uint8Array): void {
+  applyUpdate(nodeId: string, update: Uint8Array, userId?: string): void {
     const managed = this.docs.get(nodeId);
     if (!managed) return;
 
     Y.applyUpdate(managed.doc, update);
-    this.scheduleSave(nodeId);
+    this.scheduleSave(nodeId, userId);
   }
 
   /** doc에 이미 적용된 변경에 대해 debounced save만 예약 */
-  scheduleSave(nodeId: string): void {
+  scheduleSave(nodeId: string, userId?: string): void {
     const managed = this.docs.get(nodeId);
     if (!managed) return;
 
     managed.lastActivity = Date.now();
+    managed.dirtyForEmbed = true;
+    if (userId) managed.lastEditorUserId = userId;
 
     if (managed.saveTimer) clearTimeout(managed.saveTimer);
     managed.saveTimer = setTimeout(() => {
@@ -174,6 +186,16 @@ export class YjsDocManager implements OnModuleDestroy {
         managed.workspaceId
       )
     ]);
+
+    // 실제 편집이 있었던 flush에서만 재임베딩 job을 적재 (세이프티 플러시로 인한 중복 방지)
+    if (managed.dirtyForEmbed && managed.lastEditorUserId) {
+      managed.dirtyForEmbed = false;
+      await this.embedQueueService.enqueueEmbedJob({
+        nodeId,
+        userId: managed.lastEditorUserId,
+        workspaceId: managed.workspaceId
+      });
+    }
   }
 
   async flushAll(): Promise<void> {

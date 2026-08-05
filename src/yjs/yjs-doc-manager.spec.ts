@@ -1,10 +1,12 @@
 import * as Y from 'yjs';
 import { YjsDocManager } from './yjs-doc-manager';
 import { YjsCrdtService } from './yjs-crdt.service';
+import { EmbedQueueService } from 'src/redis/embed-queue.service';
 
 describe('YjsDocManager', () => {
   let manager: YjsDocManager;
   let mockCrdtService: jest.Mocked<YjsCrdtService>;
+  let mockEmbedQueueService: jest.Mocked<EmbedQueueService>;
 
   beforeEach(() => {
     mockCrdtService = {
@@ -15,7 +17,11 @@ describe('YjsDocManager', () => {
       deleteFromRedis: jest.fn().mockResolvedValue(undefined),
     } as any;
 
-    manager = new YjsDocManager(mockCrdtService);
+    mockEmbedQueueService = {
+      enqueueEmbedJob: jest.fn().mockResolvedValue(undefined),
+    } as any;
+
+    manager = new YjsDocManager(mockCrdtService, mockEmbedQueueService);
   });
 
   afterEach(async () => {
@@ -151,6 +157,38 @@ describe('YjsDocManager', () => {
         'Flush me',
         'ws-1',
       );
+    });
+
+    it('does not enqueue an embed job when flushed without a tracked edit (e.g. safety flush of an untouched doc)', async () => {
+      const doc = await manager.getOrCreateDoc('node-1', 'ws-1');
+      doc.get('root', Y.XmlText).insert(0, 'Flush me');
+
+      await manager.flushDoc('node-1');
+
+      expect(mockEmbedQueueService.enqueueEmbedJob).not.toHaveBeenCalled();
+    });
+
+    it('enqueues an embed job when the doc was edited via scheduleSave with a userId', async () => {
+      await manager.getOrCreateDoc('node-1', 'ws-1');
+      manager.scheduleSave('node-1', 'user-1');
+
+      await manager.flushDoc('node-1');
+
+      expect(mockEmbedQueueService.enqueueEmbedJob).toHaveBeenCalledWith({
+        nodeId: 'node-1',
+        userId: 'user-1',
+        workspaceId: 'ws-1',
+      });
+    });
+
+    it('does not enqueue an embed job twice for a single edit (dirty flag reset after flush)', async () => {
+      await manager.getOrCreateDoc('node-1', 'ws-1');
+      manager.scheduleSave('node-1', 'user-1');
+
+      await manager.flushDoc('node-1');
+      await manager.flushDoc('node-1');
+
+      expect(mockEmbedQueueService.enqueueEmbedJob).toHaveBeenCalledTimes(1);
     });
   });
 

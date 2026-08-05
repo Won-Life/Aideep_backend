@@ -299,7 +299,7 @@ export class WsGateway
       if (client.data.yjsReadOnly?.[nodeId]) return;
 
       client.to(yjsRoom(nodeId)).emit(YJS_EVENT.SYNC, { nodeId, data });
-      this.yjsDocManager.scheduleSave(nodeId);
+      this.yjsDocManager.scheduleSave(nodeId, client.data.userId);
     }
   }
 

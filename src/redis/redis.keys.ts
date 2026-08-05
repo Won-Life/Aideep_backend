@@ -9,5 +9,6 @@ export const REDIS_KEYS = {
   INVITE_WORKSPACE: (workspaceId: string) => `inviteCode:${workspaceId}`,
   YJS_DOC: (nodeId: string) => `yjs:doc:${nodeId}`,
   YJS_WS_AWARENESS: (workspaceId: string) => `yjs:ws:awareness:${workspaceId}`,
-  WS_PRESENCE: (workspaceId: string) => `ws:presence:${workspaceId}`
+  WS_PRESENCE: (workspaceId: string) => `ws:presence:${workspaceId}`,
+  EMBED_JOBS_QUEUE: 'embed_jobs'
 };
