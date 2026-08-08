@@ -75,7 +75,7 @@ TDD 사이클(RED-GREEN-REFACTOR)로 M1-M6 전체 마일스톤을 완료했다. 
 ## §E.3 Run-phase Audit-Ready Signal
 
 - `run_complete_at: 2026-08-08`
-- `run_commit_sha: <pending — see M1 commit below>`
+- `run_commit_sha: dedf63a`
 - `run_status: PASS`
 - `ac_pass_count: 8`
 - `ac_fail_count: 0`
