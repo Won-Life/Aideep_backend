@@ -18,6 +18,7 @@ import { EdgeModule } from './edge/edge.module';
 import { MeetModule } from './meet/meet.module';
 import { UploadModule } from './upload/upload.module';
 import { AiModule } from './ai/ai.module';
+import { MeetingModule } from './meeting/meeting.module';
 import { MetricsModule } from './common/metrics';
 import { createWinstonConsoleTransport } from './common/logging/winston.console';
 
@@ -39,6 +40,7 @@ import { createWinstonConsoleTransport } from './common/logging/winston.console'
     MeetModule,
     UploadModule,
     AiModule,
+    MeetingModule,
     MetricsModule
   ],
   controllers: [AppController],

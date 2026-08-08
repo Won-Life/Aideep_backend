@@ -13,12 +13,16 @@ export class AiBeClient {
     this.baseUrl = this.config.getOrThrow<string>('AI_BE_URL');
   }
 
-  async post<T>(path: string, payload: unknown): Promise<T> {
+  async post<T>(
+    path: string,
+    payload: unknown,
+    extraHeaders?: Record<string, string>
+  ): Promise<T> {
     let response: Response;
     try {
       response = await fetch(`${this.baseUrl}${path}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...extraHeaders },
         body: JSON.stringify(payload),
         signal: AbortSignal.timeout(TIMEOUT_MS)
       });

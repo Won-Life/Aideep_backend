@@ -69,4 +69,43 @@ describe('AiBeClient', () => {
 
     await expect(client.post('/chat', {})).rejects.toBeInstanceOf(AiBeBadRequestError);
   });
+
+  it('extraHeaders를 전달하면 Content-Type과 병합되어 fetch 헤더에 실린다', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ relationType: 'CHILD', nodeId: 'node-1', parentNodeId: null })
+    }) as any;
+
+    await client.post(
+      '/meeting/transcript',
+      { workspaceId: 'ws-1' },
+      { Authorization: 'Bearer relayed-token' }
+    );
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://ai-be.test/meeting/transcript',
+      expect.objectContaining({
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer relayed-token'
+        }
+      })
+    );
+  });
+
+  it('extraHeaders를 생략하면(REQ-MEETING-PROXY-009 회귀) 기존 /chat·/retrieve 호출부와 동일하게 Content-Type만 포함된다', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ answer: 'hi', sources: [] })
+    }) as any;
+
+    await client.post('/chat', { query: 'hi', user_id: 'u1' });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://ai-be.test/chat',
+      expect.objectContaining({
+        headers: { 'Content-Type': 'application/json' }
+      })
+    );
+  });
 });
