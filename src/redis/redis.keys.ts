@@ -11,5 +11,6 @@ export const REDIS_KEYS = {
   YJS_WS_AWARENESS: (workspaceId: string) => `yjs:ws:awareness:${workspaceId}`,
   WS_PRESENCE: (workspaceId: string) => `ws:presence:${workspaceId}`,
   OAUTH_SIGNUP_TICKET: (ticket: string) => `oauth:signup_ticket:${ticket}`,
-  OAUTH_LINK_NONCE: (nonce: string) => `oauth:link_state:${nonce}`
+  OAUTH_LINK_NONCE: (nonce: string) => `oauth:link_state:${nonce}`,
+  EMBED_JOBS_QUEUE: 'embed_jobs'
 };

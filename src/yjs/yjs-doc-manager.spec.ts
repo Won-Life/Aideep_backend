@@ -1,10 +1,13 @@
 import * as Y from 'yjs';
 import { YjsDocManager } from './yjs-doc-manager';
 import { YjsCrdtService } from './yjs-crdt.service';
+import { EmbedQueueService } from 'src/redis/embed-queue.service';
+import { DEBOUNCE_SAVE_MS } from './yjs.constants';
 
 describe('YjsDocManager', () => {
   let manager: YjsDocManager;
   let mockCrdtService: jest.Mocked<YjsCrdtService>;
+  let mockEmbedQueueService: jest.Mocked<EmbedQueueService>;
 
   beforeEach(() => {
     mockCrdtService = {
@@ -15,7 +18,11 @@ describe('YjsDocManager', () => {
       deleteFromRedis: jest.fn().mockResolvedValue(undefined),
     } as any;
 
-    manager = new YjsDocManager(mockCrdtService);
+    mockEmbedQueueService = {
+      enqueueEmbedJob: jest.fn().mockResolvedValue(undefined),
+    } as any;
+
+    manager = new YjsDocManager(mockCrdtService, mockEmbedQueueService);
   });
 
   afterEach(async () => {
@@ -151,6 +158,84 @@ describe('YjsDocManager', () => {
         'Flush me',
         'ws-1',
       );
+    });
+
+    it('does not enqueue an embed job when flushed without a tracked edit (e.g. safety flush of an untouched doc)', async () => {
+      const doc = await manager.getOrCreateDoc('node-1', 'ws-1');
+      doc.get('root', Y.XmlText).insert(0, 'Flush me');
+
+      await manager.flushDoc('node-1');
+
+      expect(mockEmbedQueueService.enqueueEmbedJob).not.toHaveBeenCalled();
+    });
+
+    it('enqueues an embed job when the doc was edited via scheduleSave with a userId', async () => {
+      await manager.getOrCreateDoc('node-1', 'ws-1');
+      manager.scheduleSave('node-1', 'user-1');
+
+      await manager.flushDoc('node-1');
+
+      expect(mockEmbedQueueService.enqueueEmbedJob).toHaveBeenCalledWith({
+        nodeId: 'node-1',
+        userId: 'user-1',
+        workspaceId: 'ws-1',
+      });
+    });
+
+    it('does not enqueue an embed job twice for a single edit (dirty flag reset after flush)', async () => {
+      await manager.getOrCreateDoc('node-1', 'ws-1');
+      manager.scheduleSave('node-1', 'user-1');
+
+      await manager.flushDoc('node-1');
+      await manager.flushDoc('node-1');
+
+      expect(mockEmbedQueueService.enqueueEmbedJob).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('debounced auto-flush (실제 setTimeout 트리거 검증)', () => {
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => jest.useRealTimers());
+
+    it('DEBOUNCE_SAVE_MS가 지나기 전에는 자동 flush가 발생하지 않는다', async () => {
+      await manager.getOrCreateDoc('node-1', 'ws-1');
+      manager.scheduleSave('node-1', 'user-1');
+
+      await jest.advanceTimersByTimeAsync(DEBOUNCE_SAVE_MS - 1);
+
+      expect(mockCrdtService.saveToDb).not.toHaveBeenCalled();
+      expect(mockEmbedQueueService.enqueueEmbedJob).not.toHaveBeenCalled();
+    });
+
+    it('DEBOUNCE_SAVE_MS가 지나면 자동으로 flushDoc이 실행되어 embed job이 enqueue된다', async () => {
+      await manager.getOrCreateDoc('node-1', 'ws-1');
+      manager.scheduleSave('node-1', 'user-1');
+
+      await jest.advanceTimersByTimeAsync(DEBOUNCE_SAVE_MS);
+
+      expect(mockCrdtService.saveToDb).toHaveBeenCalledTimes(1);
+      expect(mockEmbedQueueService.enqueueEmbedJob).toHaveBeenCalledWith({
+        nodeId: 'node-1',
+        userId: 'user-1',
+        workspaceId: 'ws-1',
+      });
+    });
+
+    it('DEBOUNCE_SAVE_MS 이내에 연속 편집하면 타이머가 리셋되어 마지막 호출 기준으로 1회만 flush된다', async () => {
+      await manager.getOrCreateDoc('node-1', 'ws-1');
+
+      manager.scheduleSave('node-1', 'user-1');
+      await jest.advanceTimersByTimeAsync(DEBOUNCE_SAVE_MS - 500);
+      manager.scheduleSave('node-1', 'user-1'); // 타이머 리셋
+
+      // 최초 호출 기준으로는 이미 지났어야 할 시점이지만, 리셋되어 아직 flush 안 됨
+      await jest.advanceTimersByTimeAsync(DEBOUNCE_SAVE_MS - 1);
+      expect(mockCrdtService.saveToDb).not.toHaveBeenCalled();
+
+      // 리셋된 타이머 기준 DEBOUNCE_SAVE_MS 경과
+      await jest.advanceTimersByTimeAsync(1);
+      expect(mockCrdtService.saveToDb).toHaveBeenCalledTimes(1);
+      expect(mockEmbedQueueService.enqueueEmbedJob).toHaveBeenCalledTimes(1);
     });
   });
 

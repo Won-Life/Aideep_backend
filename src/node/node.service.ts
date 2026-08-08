@@ -21,6 +21,7 @@ import {
   NodeMoveEvent
 } from 'src/ws/ws.event';
 import { RedisService } from 'src/redis/redis.service';
+import { EmbedQueueService } from 'src/redis/embed-queue.service';
 import { REDIS_KEYS } from 'src/redis/redis.keys';
 import {
   NodeMoveBody,
@@ -42,7 +43,8 @@ export class NodeService {
     @Inject(forwardRef(() => WsGateway))
     private readonly wsGateway: WsGateway,
     private readonly redisService: RedisService,
-    private readonly fileAttachmentService: FileAttachmentService
+    private readonly fileAttachmentService: FileAttachmentService,
+    private readonly embedQueueService: EmbedQueueService
   ) {}
 
   private async checkEditPermission(userId: string, workspaceId: string) {
@@ -110,6 +112,12 @@ export class NodeService {
       data: ans.content as Record<string, unknown>,
       createdAt: ans.created_at.toDateString()
     };
+
+    await this.embedQueueService.enqueueEmbedJob({
+      nodeId: ans.node_id,
+      userId: node.userId,
+      workspaceId: ans.workspace_id
+    });
 
     this.wsGateway.broadcast({
       type: 'NODE_CREATE',

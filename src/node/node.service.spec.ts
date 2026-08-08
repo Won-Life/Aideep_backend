@@ -7,6 +7,7 @@ import { WsGateway } from '../ws/ws.gateway';
 import { RedisService } from '../redis/redis.service';
 import { FileAttachmentService } from '../file-attachment/file-attachment.service';
 import { setTransactionRunner } from '../prisma/transaction.storage';
+import { EmbedQueueService } from '../redis/embed-queue.service';
 
 const MOCK_NODE_ID = '550e8400-e29b-41d4-a716-446655440000';
 const MOCK_WORKSPACE_ID = 'ws-uuid-5678';
@@ -39,6 +40,7 @@ describe('NodeService', () => {
     set: jest.fn(),
     del: jest.fn()
   };
+  const embedQueueService = { enqueueEmbedJob: jest.fn() };
 
   beforeAll(() => {
     // @Transactional() 데코레이터가 사용하는 러너를 pass-through로 설정
@@ -64,6 +66,7 @@ describe('NodeService', () => {
     edgeRepository = {
       deleteEdgesByNodeId: jest.fn()
     };
+    const edgeRepository = { deleteEdgesByNodeId: jest.fn() };
     wsGateway = { broadcast: jest.fn() };
     fileAttachmentService = {
       syncNodeAttachments: jest.fn(),
@@ -81,7 +84,8 @@ describe('NodeService', () => {
         {
           provide: RedisService,
           useValue: { getClient: jest.fn().mockReturnValue(mockRedisClient) }
-        }
+        },
+        { provide: EmbedQueueService, useValue: embedQueueService }
       ]
     }).compile();
 
@@ -144,6 +148,12 @@ describe('NodeService', () => {
       await service.createProjectNode(projectNode as any);
 
       expect(mockRedisClient.del).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not enqueue an embed job (PROJECT nodes are not embedding targets)', async () => {
+      await service.createProjectNode(projectNode as any);
+
+      expect(embedQueueService.enqueueEmbedJob).not.toHaveBeenCalled();
     });
   });
 
@@ -342,6 +352,16 @@ describe('NodeService', () => {
           nodeId: MOCK_NODE_ID
         })
       );
+    });
+
+    it('should enqueue an embed job for the created node', async () => {
+      await service.createMarkdownNode(mdNode as any);
+
+      expect(embedQueueService.enqueueEmbedJob).toHaveBeenCalledWith({
+        nodeId: MOCK_NODE_ID,
+        userId: MOCK_USER_ID,
+        workspaceId: MOCK_WORKSPACE_ID,
+      });
     });
   });
 });

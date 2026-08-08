@@ -17,6 +17,7 @@ import { WinstonModule } from 'nest-winston';
 import { EdgeModule } from './edge/edge.module';
 import { MeetModule } from './meet/meet.module';
 import { UploadModule } from './upload/upload.module';
+import { AiModule } from './ai/ai.module';
 import { MetricsModule } from './common/metrics';
 import { createWinstonConsoleTransport } from './common/logging/winston.console';
 
@@ -37,6 +38,7 @@ import { createWinstonConsoleTransport } from './common/logging/winston.console'
     EdgeModule,
     MeetModule,
     UploadModule,
+    AiModule,
     MetricsModule
   ],
   controllers: [AppController],
