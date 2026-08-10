@@ -6,7 +6,7 @@ import {
   NotFoundException,
   UnauthorizedException
 } from '@nestjs/common';
-import { NodeRepository, FtsRow } from './node.repository';
+import { CreatNodeItem, NodeRepository, FtsRow } from './node.repository';
 import {
   NodeSearchResponseDto,
   NodeSearchResultDto
@@ -90,7 +90,7 @@ export class NodeService {
   }
 
   @Transactional()
-  async createMarkdownNode(node: Node): Promise<NodeCreateReponse> {
+  private async createMarkdownNodeTx(node: Node): Promise<CreatNodeItem> {
     await this.checkEditPermission(node.userId, node.workspaceId);
     const ans = await this.nodeRespository.insertNode(node);
 
@@ -103,6 +103,14 @@ export class NodeService {
     await this.redisService
       .getClient()
       .del(REDIS_KEYS.WORKSPACE_SYNC(node.workspaceId));
+
+    return ans;
+  }
+
+  async createMarkdownNode(node: Node): Promise<NodeCreateReponse> {
+    // 내부 트랜잭션(createMarkdownNodeTx)이 완전히 COMMIT된 이후에만 아래 로직이 실행된다.
+    // (SPEC-EMBED-QUEUE-COMMIT-ORDER-001 — 임베딩 큐잉을 트랜잭션 커밋 이후로 지연)
+    const ans = await this.createMarkdownNodeTx(node);
 
     const nodeAns = {
       nodeId: ans.node_id,

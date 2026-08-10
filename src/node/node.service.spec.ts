@@ -1,3 +1,4 @@
+import { UnauthorizedException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { NodeService } from './node.service';
 import { NodeRepository } from './node.repository';
@@ -292,30 +293,38 @@ describe('NodeService', () => {
     it('should return the created node payload', async () => {
       const result = await service.createMarkdownNode(mdNode as any);
 
-      expect(result).toEqual(
-        expect.objectContaining({
-          nodeId: MOCK_NODE_ID,
-          nodeType: 'DATA'
-        })
-      );
+      // AC-EMBED-QUEUE-COMMIT-ORDER-003a: return value shape preserved unchanged.
+      expect(result).toEqual({
+        nodeId: MOCK_NODE_ID,
+        title: mdInsertResult.title,
+        nodeType: 'DATA',
+        position: { x: 100, y: 200 },
+        data: mdInsertResult.content,
+        createdAt: mdInsertResult.created_at.toDateString()
+      });
     });
 
-    it('should broadcast NODE_CREATE event via WsGateway', async () => {
-      await service.createMarkdownNode(mdNode as any);
+    it('should broadcast NODE_CREATE event via WsGateway exactly once with the assembled node payload', async () => {
+      const result = await service.createMarkdownNode(mdNode as any);
 
+      // AC-EMBED-QUEUE-COMMIT-ORDER-003b: broadcast fires exactly once, NODE_CREATE,
+      // with the same payload as before the transaction split.
       expect(wsGateway.broadcast).toHaveBeenCalledTimes(1);
-      expect(wsGateway.broadcast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'NODE_CREATE',
-          workspaceId: MOCK_WORKSPACE_ID,
-          userId: MOCK_USER_ID
-        })
-      );
+      expect(wsGateway.broadcast).toHaveBeenCalledWith({
+        type: 'NODE_CREATE',
+        workspaceId: MOCK_WORKSPACE_ID,
+        userId: MOCK_USER_ID,
+        node: result
+      });
     });
 
-    it('should sync file attachments with inserted content', async () => {
+    it('should sync file attachments with inserted content exactly once', async () => {
       await service.createMarkdownNode(mdNode as any);
 
+      // AC-EMBED-QUEUE-COMMIT-ORDER-003c
+      expect(fileAttachmentService.syncNodeAttachments).toHaveBeenCalledTimes(
+        1
+      );
       expect(fileAttachmentService.syncNodeAttachments).toHaveBeenCalledWith(
         MOCK_NODE_ID,
         MOCK_WORKSPACE_ID,
@@ -329,7 +338,83 @@ describe('NodeService', () => {
       expect(embedQueueService.enqueueEmbedJob).toHaveBeenCalledWith({
         nodeId: MOCK_NODE_ID,
         userId: MOCK_USER_ID,
-        workspaceId: MOCK_WORKSPACE_ID,
+        workspaceId: MOCK_WORKSPACE_ID
+      });
+    });
+
+    it('should not enqueue an embed job when the node insert fails (AC-EMBED-QUEUE-COMMIT-ORDER-002)', async () => {
+      nodeRepository.insertNode.mockRejectedValue(new Error('insert failed'));
+
+      await expect(service.createMarkdownNode(mdNode as any)).rejects.toThrow(
+        'insert failed'
+      );
+
+      expect(embedQueueService.enqueueEmbedJob).not.toHaveBeenCalled();
+      expect(wsGateway.broadcast).not.toHaveBeenCalled();
+    });
+
+    it('should not write to the DB or enqueue an embed job when the user lacks edit permission', async () => {
+      workspaceRepository.checkWorkspace.mockResolvedValue({ role: 'VIEWER' });
+
+      await expect(service.createMarkdownNode(mdNode as any)).rejects.toThrow(
+        UnauthorizedException
+      );
+
+      expect(nodeRepository.insertNode).not.toHaveBeenCalled();
+      expect(fileAttachmentService.syncNodeAttachments).not.toHaveBeenCalled();
+      expect(embedQueueService.enqueueEmbedJob).not.toHaveBeenCalled();
+    });
+
+    describe('commit-order (AC-EMBED-QUEUE-COMMIT-ORDER-001a/001b)', () => {
+      afterEach(() => {
+        // Restore the pass-through runner shared by every other test in this file.
+        setTransactionRunner((fn) => fn());
+      });
+
+      it('should enqueue the embed job only after the internal transaction has committed', async () => {
+        const commitLog: string[] = [];
+
+        // A test-local runner that stands in for PrismaService.runInTransaction.
+        // It records when the wrapped transactional callback is invoked, and
+        // — after that callback resolves — inserts an observable async gap
+        // before recording the commit, standing in for the real Postgres
+        // COMMIT flush that happens after the transactional callback resolves.
+        setTransactionRunner(async (fn) => {
+          commitLog.push('tx:start');
+          const result = await fn();
+          await new Promise((resolve) => setImmediate(resolve));
+          commitLog.push('tx:commit');
+          return result;
+        });
+
+        fileAttachmentService.syncNodeAttachments.mockImplementation(
+          async () => {
+            commitLog.push('syncNodeAttachments');
+          }
+        );
+        mockRedisClient.del.mockImplementation(async () => {
+          commitLog.push('redisDel');
+        });
+        embedQueueService.enqueueEmbedJob.mockImplementation(async () => {
+          commitLog.push('enqueueEmbedJob');
+        });
+
+        await service.createMarkdownNode(mdNode as any);
+
+        const commitIndex = commitLog.indexOf('tx:commit');
+        const syncIndex = commitLog.indexOf('syncNodeAttachments');
+        const redisDelIndex = commitLog.indexOf('redisDel');
+        const enqueueIndex = commitLog.indexOf('enqueueEmbedJob');
+
+        // The transaction must have actually run and committed.
+        expect(commitIndex).toBeGreaterThanOrEqual(0);
+        // The two transactional writes happen before commit.
+        expect(syncIndex).toBeGreaterThanOrEqual(0);
+        expect(syncIndex).toBeLessThan(commitIndex);
+        expect(redisDelIndex).toBeGreaterThanOrEqual(0);
+        expect(redisDelIndex).toBeLessThan(commitIndex);
+        // AC-001a / AC-001b: enqueueEmbedJob happens strictly after commit.
+        expect(enqueueIndex).toBeGreaterThan(commitIndex);
       });
     });
   });
