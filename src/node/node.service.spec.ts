@@ -66,7 +66,6 @@ describe('NodeService', () => {
     edgeRepository = {
       deleteEdgesByNodeId: jest.fn()
     };
-    const edgeRepository = { deleteEdgesByNodeId: jest.fn() };
     wsGateway = { broadcast: jest.fn() };
     fileAttachmentService = {
       syncNodeAttachments: jest.fn(),
@@ -323,6 +322,16 @@ describe('NodeService', () => {
         mdInsertResult.content
       );
     });
+
+    it('should enqueue an embed job for the created node', async () => {
+      await service.createMarkdownNode(mdNode as any);
+
+      expect(embedQueueService.enqueueEmbedJob).toHaveBeenCalledWith({
+        nodeId: MOCK_NODE_ID,
+        userId: MOCK_USER_ID,
+        workspaceId: MOCK_WORKSPACE_ID,
+      });
+    });
   });
 
   describe('deleteNode', () => {
@@ -352,16 +361,6 @@ describe('NodeService', () => {
           nodeId: MOCK_NODE_ID
         })
       );
-    });
-
-    it('should enqueue an embed job for the created node', async () => {
-      await service.createMarkdownNode(mdNode as any);
-
-      expect(embedQueueService.enqueueEmbedJob).toHaveBeenCalledWith({
-        nodeId: MOCK_NODE_ID,
-        userId: MOCK_USER_ID,
-        workspaceId: MOCK_WORKSPACE_ID,
-      });
     });
   });
 });
