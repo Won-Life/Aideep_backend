@@ -10,6 +10,8 @@ type BaseJwtPayload = {
   userName: string;
   email: string;
   user_id: string;
+  // 세션(기기) 식별자 — 로그인마다 새로 발급. 구 토큰에는 없음 (#69)
+  jti?: string;
 };
 
 export type UserJwtPayload = BaseJwtPayload & { isMaster?: false };
