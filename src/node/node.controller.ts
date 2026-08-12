@@ -79,6 +79,22 @@ export class NodeController {
     return { nodeId };
   }
 
+  // ':nodeId' 와일드카드보다 먼저 선언해야 'archived'가 nodeId로 매칭되지 않는다
+  @Get('/archived')
+  @ApiOperation({
+    summary: '보관된 노드 목록 조회',
+    description:
+      '워크스페이스에서 보관 처리(soft delete)된 노드 목록을 조회합니다.'
+  })
+  @ApiSuccessResponse(NodeDetailDto, 200, '보관된 노드 목록 조회 성공')
+  async queryArchivedNodes(
+    @Param('workspaceId') workspaceId: string,
+    @Request() req: any
+  ) {
+    const userId = req.user?.user_id;
+    return await this.nodeService.listArchivedNodes(workspaceId, userId);
+  }
+
   @Get(':nodeId')
   @ApiOperation({
     summary: '노드 상세 조회',
@@ -163,6 +179,23 @@ export class NodeController {
   //   await this.nodeService.createPdfNode(node);
   //   return '생성 성공';
   // }
+
+  @Patch('/:nodeId/restore')
+  @ApiOperation({
+    summary: '보관된 노드 복원',
+    description:
+      '보관 처리된 노드를 복원합니다. 보관 시 엣지는 삭제되었으므로 독립 노드로 복원됩니다.'
+  })
+  @ApiParam({ name: 'nodeId', description: '노드 ID' })
+  @ApiSuccessResponse(NodeDetailDto, 200, '노드 복원 성공')
+  async restoreNode(
+    @Request() req: any,
+    @Param('workspaceId') workspaceId: string,
+    @Param('nodeId') nodeId: string
+  ) {
+    const userId = req.user?.user_id;
+    return await this.nodeService.restoreNode(workspaceId, userId, nodeId);
+  }
 
   @Delete(':nodeId')
   @ApiOperation({

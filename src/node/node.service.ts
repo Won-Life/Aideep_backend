@@ -307,6 +307,53 @@ export class NodeService {
     }
   }
 
+  async listArchivedNodes(workspaceId: string, userId: string) {
+    const checkWorkspace = await this.workspaceRepository.checkWorkspace(
+      userId,
+      workspaceId
+    );
+    if (!checkWorkspace) {
+      throw new NotFoundException(
+        '해당 유저의 워크스페이스가 존재하지 않습니다.'
+      );
+    }
+    return await this.nodeRespository.selectArchivedNodes(workspaceId, userId);
+  }
+
+  async restoreNode(workspaceId: string, userId: string, nodeId: string) {
+    await this.checkEditPermission(userId, workspaceId);
+
+    const existing = await this.nodeRespository.selectArchivedNodeById(
+      workspaceId,
+      nodeId
+    );
+    if (!existing) {
+      throw new NotFoundException('보관된 노드를 찾을 수 없습니다.');
+    }
+
+    const restored = await this.nodeRespository.restoreNode(nodeId);
+    await this.redisService
+      .getClient()
+      .del(REDIS_KEYS.WORKSPACE_SYNC(workspaceId));
+
+    // 복원은 협업자 입장에서 새 노드 등장과 동일 → NODE_CREATE로 브로드캐스트
+    this.wsGateway.broadcast({
+      type: 'NODE_CREATE',
+      workspaceId: restored.workspace_id,
+      userId: userId,
+      node: {
+        nodeId: restored.node_id,
+        title: restored.title,
+        nodeType: restored.node_type,
+        position: { x: restored.position_x, y: restored.position_y },
+        data: restored.content as Record<string, unknown>,
+        createdAt: restored.created_at.toDateString()
+      }
+    } as NodeCreateEvent);
+
+    return restored;
+  }
+
   @Transactional()
   async deleteNode(workspaceId: string, userId: string, nodeId: string) {
     await this.checkEditPermission(userId, workspaceId);
