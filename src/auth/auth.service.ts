@@ -22,6 +22,7 @@ import { VerifyEmailRequestBody } from './dtos/verifyEmail.dto';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston/dist/winston.constants';
 import { GoogleProfile } from './strategy/google.strategy';
 import { OAuthAccountRepository } from './oauth/oauth-account.repository';
+import { WorkspaceRepository } from 'src/workspace/workspace.repository';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Prisma } from 'src/generated/prisma/client';
 
@@ -30,6 +31,7 @@ export class AuthService {
   constructor(
     private readonly userRepository: UserRepository,
     private readonly oauthAccountRepository: OAuthAccountRepository,
+    private readonly workspaceRepository: WorkspaceRepository,
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly redisService: RedisService,
@@ -109,6 +111,42 @@ export class AuthService {
       });
 
     return { accessToken, refreshToken };
+  }
+
+  /**
+   * 시연용 게스트 진입 — QR 1회 스캔마다 게스트 계정을 만들어 데모 워크스페이스에 참여시킨다.
+   * 계정을 공유하면 refresh 토큰이 서로를 덮어써 먼저 접속한 사람이 튕기고, 커서·참여자가
+   * 전부 같은 이름으로 보여 실시간 협업 시연이 성립하지 않는다.
+   */
+  async enterDemo() {
+    const workspaceId = process.env.DEMO_WORKSPACE_ID;
+    if (!workspaceId) {
+      throw new NotFoundException('데모 워크스페이스가 설정되지 않았습니다.');
+    }
+
+    const suffix = crypto.randomUUID().slice(0, 8);
+    const guest = await this.userRepository.create({
+      email: `guest-${suffix}@demo.aideep.local`,
+      password: await bcrypt.hash(crypto.randomUUID(), 10),
+      name: `게스트-${suffix.slice(0, 4)}`,
+      phone: ''
+    });
+
+    await this.workspaceRepository.insertWorkspaceUser(
+      guest.user_id,
+      workspaceId,
+      'EDITOR'
+    );
+
+    this.logger.warn(
+      `[DEMO_GUEST_CREATED] user=${guest.user_id} workspace=${workspaceId}`
+    );
+
+    return await this.login({
+      userName: guest.username,
+      email: guest.email,
+      user_id: guest.user_id
+    });
   }
 
   async refresh(refreshToken: string) {
