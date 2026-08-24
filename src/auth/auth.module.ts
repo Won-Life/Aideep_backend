@@ -9,6 +9,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { JwtStrategy } from './strategy/jwt.strategy';
 import { GoogleStrategy } from './strategy/google.strategy';
 import { OAuthAccountRepository } from './oauth/oauth-account.repository';
+import { WorkspaceRepository } from 'src/workspace/workspace.repository';
 
 @Module({
   imports: [
@@ -23,7 +24,15 @@ import { OAuthAccountRepository } from './oauth/oauth-account.repository';
     })
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtAuthGuard, LocalStrategy, JwtStrategy, GoogleStrategy, OAuthAccountRepository],
+  providers: [
+    AuthService,
+    JwtAuthGuard,
+    LocalStrategy,
+    JwtStrategy,
+    GoogleStrategy,
+    OAuthAccountRepository,
+    WorkspaceRepository
+  ],
   exports: [JwtAuthGuard, JwtModule]
 })
 export class AuthModule {}

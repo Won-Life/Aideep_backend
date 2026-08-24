@@ -3,9 +3,11 @@ import {
   Controller,
   Delete,
   Get,
+  NotFoundException,
   Param,
   Patch,
   Post,
+  Query,
   Request,
   Res,
   UseGuards
@@ -188,6 +190,31 @@ export class AuthController {
         'oauth_failed';
       res.redirect(`${callbackUrl}?kind=error&reason=${reason}`);
     }
+  }
+
+  @Get('/demo/enter')
+  @ApiOperation({
+    summary: '시연용 게스트 진입 (QR)',
+    description:
+      'DEMO_SECRET 이 일치하면 게스트 계정을 생성해 데모 워크스페이스에 참여시키고, ' +
+      'google 콜백과 동일한 규약으로 {FRONTEND_URL}/oauth/callback 에 토큰을 실어 리다이렉트합니다.'
+  })
+  async enterDemo(@Query('key') key: string, @Res() res: Response) {
+    const secret = process.env.DEMO_SECRET;
+    // 엔드포인트 존재 자체를 숨기기 위해 401 대신 404를 던진다.
+    if (!secret || key !== secret) {
+      throw new NotFoundException('Cannot GET /auth/demo/enter');
+    }
+
+    const { accessToken, refreshToken } = await this.authService.enterDemo();
+    const params = new URLSearchParams({
+      kind: 'login',
+      accessToken,
+      refreshToken
+    });
+    res.redirect(
+      `${process.env.FRONTEND_URL}/oauth/callback?${params.toString()}`
+    );
   }
 
   // ─── OAuth 회원가입 2-step complete (D-001, D-016: public) ────────────────
