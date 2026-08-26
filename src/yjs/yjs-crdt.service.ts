@@ -76,7 +76,7 @@ export class YjsCrdtService {
     state: Buffer,
     markdownText: string,
     workspaceId: string
-  ): Promise<void> {
+  ): Promise<{ version: number; updatedAt: Date }> {
     // 현재 content를 읽어서 markdownBody만 업데이트
     const node = await this.prisma.client.nodes.findUnique({
       where: { node_id: nodeId },
@@ -86,7 +86,7 @@ export class YjsCrdtService {
     const currentContent = (node?.content as Record<string, any>) ?? {};
     const updatedContent = { ...currentContent, markdownBody: markdownText };
 
-    await this.prisma.client.nodes.update({
+    const updated = await this.prisma.client.nodes.update({
       where: { node_id: nodeId },
       data: {
         yjs_state: new Uint8Array(state),
@@ -107,5 +107,7 @@ export class YjsCrdtService {
       .getClient()
       .del(REDIS_KEYS.WORKSPACE_SYNC(workspaceId))
       .catch(() => {});
+
+    return { version: updated.version, updatedAt: updated.updated_at };
   }
 }

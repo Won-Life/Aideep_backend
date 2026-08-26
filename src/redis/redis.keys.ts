@@ -9,6 +9,12 @@ export const REDIS_KEYS = {
   INVITE_WORKSPACE: (workspaceId: string) => `inviteCode:${workspaceId}`,
   YJS_DOC: (nodeId: string) => `yjs:doc:${nodeId}`,
   YJS_WS_AWARENESS: (workspaceId: string) => `yjs:ws:awareness:${workspaceId}`,
+  NODE_CONTENT_OPERATION: (
+    workspaceId: string,
+    nodeId: string,
+    actorId: string,
+    key: string
+  ) => `node:content-op:${workspaceId}:${nodeId}:${actorId}:${key}`,
   WS_PRESENCE: (workspaceId: string) => `ws:presence:${workspaceId}`,
   OAUTH_SIGNUP_TICKET: (ticket: string) => `oauth:signup_ticket:${ticket}`,
   OAUTH_LINK_NONCE: (nonce: string) => `oauth:link_state:${nonce}`,

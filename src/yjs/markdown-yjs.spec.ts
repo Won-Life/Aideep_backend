@@ -1,5 +1,9 @@
 import * as Y from 'yjs';
-import { markdownToYjsUpdate } from './markdown-yjs';
+import {
+  appendMarkdownToYjsDoc,
+  markdownToYjsUpdate,
+  yjsDocToMarkdown
+} from './markdown-yjs';
 
 // Y.XmlText/XmlElement 트리를 순회해 텍스트만 뽑는다 (렌더될 실제 내용 확인용)
 function collectText(node: any): string {
@@ -45,5 +49,40 @@ describe('markdownToYjsUpdate', () => {
 
   it('빈 문자열도 예외 없이 처리한다', () => {
     expect(() => markdownToYjsUpdate('')).not.toThrow();
+  });
+
+  it('구조화된 Y.Doc을 Markdown으로 왕복 변환한다', () => {
+    const doc = new Y.Doc();
+    Y.applyUpdate(doc, markdownToYjsUpdate(MD));
+
+    const markdown = yjsDocToMarkdown(doc);
+
+    expect(markdown).toContain('# 회의 제목');
+    expect(markdown).toContain('- 항목1');
+    expect(markdown).toContain('- 항목2');
+    doc.destroy();
+  });
+
+  it('기존 Lexical 구조를 보존하며 Markdown 블록을 append한다', () => {
+    const doc = new Y.Doc();
+    Y.applyUpdate(doc, markdownToYjsUpdate(MD));
+    const stateVector = Y.encodeStateVector(doc);
+
+    const result = appendMarkdownToYjsDoc(
+      doc,
+      '## 결정 사항\n\n> 실시간 노드 편집을 우선한다.'
+    );
+
+    expect(result.markdown).toContain('# 회의 제목');
+    expect(result.markdown).toContain('## 결정 사항');
+    expect(result.markdown).toContain('> 실시간 노드 편집을 우선한다.');
+    expect(result.update.byteLength).toBeGreaterThan(0);
+    expect(Y.encodeStateAsUpdate(doc, stateVector)).toEqual(result.update);
+
+    const root = doc.get('root', Y.XmlText);
+    expect(root.toDelta().some((item) => typeof item.insert !== 'string')).toBe(
+      true
+    );
+    doc.destroy();
   });
 });

@@ -375,4 +375,13 @@ export class WsGateway
       });
     }
   }
+
+  broadcastYjsUpdate(nodeId: string, update: Uint8Array): void {
+    const encoder = encoding.createEncoder();
+    syncProtocol.writeUpdate(encoder, update);
+    this.server.to(yjsRoom(nodeId)).emit(YJS_EVENT.SYNC, {
+      nodeId,
+      data: Array.from(encoding.toUint8Array(encoder))
+    });
+  }
 }
