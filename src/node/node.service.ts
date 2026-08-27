@@ -4,8 +4,11 @@ import {
   Inject,
   Injectable,
   NotFoundException,
-  UnauthorizedException
+  UnauthorizedException,
+  ConflictException,
+  UnprocessableEntityException
 } from '@nestjs/common';
+import { createHash, randomUUID } from 'crypto';
 import { CreatNodeItem, NodeRepository, FtsRow } from './node.repository';
 import {
   NodeSearchResponseDto,
@@ -33,6 +36,11 @@ import {
 import { Transactional } from 'src/prisma/transactional.decorator';
 import { NodeCreateReponse } from './dto/createNode.dto';
 import { FileAttachmentService } from 'src/file-attachment/file-attachment.service';
+import { YjsDocManager } from 'src/yjs/yjs-doc-manager';
+import {
+  NodeContentOperationBody,
+  NodeContentOperationResponse
+} from './dto/nodeContentOperation.dto';
 
 @Injectable()
 export class NodeService {
@@ -44,8 +52,114 @@ export class NodeService {
     private readonly wsGateway: WsGateway,
     private readonly redisService: RedisService,
     private readonly fileAttachmentService: FileAttachmentService,
-    private readonly embedQueueService: EmbedQueueService
+    private readonly embedQueueService: EmbedQueueService,
+    private readonly yjsDocManager: YjsDocManager
   ) {}
+
+  async executeContentOperation(
+    userId: string,
+    workspaceId: string,
+    nodeId: string,
+    idempotencyKey: string,
+    body: NodeContentOperationBody
+  ): Promise<NodeContentOperationResponse> {
+    if (
+      !idempotencyKey ||
+      idempotencyKey.length < 8 ||
+      idempotencyKey.length > 128
+    ) {
+      throw new BadRequestException({ code: 'INVALID_IDEMPOTENCY_KEY' });
+    }
+    if (!body.markdown.trim()) {
+      throw new BadRequestException({ code: 'EMPTY_MARKDOWN' });
+    }
+
+    await this.checkEditPermission(userId, workspaceId);
+    const existing = await this.nodeRespository.selectNodeById(
+      workspaceId,
+      nodeId
+    );
+    if (!existing) throw new NotFoundException({ code: 'NODE_NOT_FOUND' });
+    const content = (existing.content as Record<string, unknown>) ?? {};
+    if (content.dataType !== 'MARKDOWN') {
+      throw new UnprocessableEntityException({
+        code: 'NODE_TYPE_NOT_EDITABLE'
+      });
+    }
+
+    const requestHash = createHash('sha256')
+      .update(JSON.stringify(body))
+      .digest('hex');
+    const cacheKey = REDIS_KEYS.NODE_CONTENT_OPERATION(
+      workspaceId,
+      nodeId,
+      userId,
+      idempotencyKey
+    );
+    const cachedRaw = await this.redisService.getClient().get(cacheKey);
+    if (typeof cachedRaw === 'string') {
+      const cached = JSON.parse(cachedRaw) as {
+        requestHash: string;
+        state?: 'IN_PROGRESS';
+        response?: NodeContentOperationResponse;
+      };
+      if (cached.requestHash !== requestHash) {
+        throw new ConflictException({ code: 'IDEMPOTENCY_KEY_REUSED' });
+      }
+      if (cached.state === 'IN_PROGRESS' || !cached.response) {
+        throw new ConflictException({ code: 'OPERATION_IN_PROGRESS' });
+      }
+      return { ...cached.response, duplicate: true };
+    }
+
+    if (
+      body.expectedVersion !== undefined &&
+      body.expectedVersion !== existing.version
+    ) {
+      throw new ConflictException({
+        code: 'VERSION_CONFLICT',
+        currentVersion: existing.version
+      });
+    }
+
+    const claimed = await this.redisService
+      .getClient()
+      .set(cacheKey, JSON.stringify({ requestHash, state: 'IN_PROGRESS' }), {
+        EX: 60,
+        NX: true
+      });
+    if (claimed !== 'OK') {
+      throw new ConflictException({ code: 'OPERATION_IN_PROGRESS' });
+    }
+
+    let persisted: Awaited<ReturnType<YjsDocManager['appendMarkdown']>>;
+    try {
+      persisted = await this.yjsDocManager.appendMarkdown(
+        nodeId,
+        workspaceId,
+        body.markdown,
+        userId
+      );
+    } catch (error) {
+      await this.redisService.getClient().del(cacheKey);
+      throw error;
+    }
+    this.wsGateway.broadcastYjsUpdate(nodeId, persisted.update);
+
+    const response: NodeContentOperationResponse = {
+      operationId: randomUUID(),
+      nodeId,
+      operation: body.operation,
+      previousVersion: existing.version,
+      version: persisted.version,
+      updatedAt: persisted.updatedAt,
+      duplicate: false
+    };
+    await this.redisService
+      .getClient()
+      .set(cacheKey, JSON.stringify({ requestHash, response }), { EX: 86_400 });
+    return response;
+  }
 
   private async checkEditPermission(userId: string, workspaceId: string) {
     const checkWorkspace = await this.workspaceRepository.checkWorkspace(

@@ -10,7 +10,8 @@ import {
   Inject,
   LoggerService,
   Delete,
-  Query
+  Query,
+  Headers
 } from '@nestjs/common';
 import { NodeService } from './node.service';
 import {
@@ -37,6 +38,10 @@ import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { ApiSuccessResponse } from 'src/common/response/api-success-response.decorator';
 import { NodeDetailDto } from './dto/nodeDetail.dto';
 import { NodeSearchResponseDto } from './dto/nodeSearch.dto';
+import {
+  NodeContentOperationBody,
+  NodeContentOperationResponse
+} from './dto/nodeContentOperation.dto';
 
 @ApiTags('Node')
 @Controller('workspace/:workspaceId/node')
@@ -159,6 +164,34 @@ export class NodeController {
       userId,
       nodeId,
       workspaceId,
+      body
+    );
+  }
+
+  @Post('/:nodeId/content-operations')
+  @ApiOperation({
+    summary: '노드 본문 operation 실행',
+    description:
+      'Agent의 Markdown append 명령을 서버 측 Lexical/Yjs 트랜잭션으로 적용하고 실시간 편집자에게 전파합니다.'
+  })
+  @ApiParam({ name: 'nodeId', description: '노드 아이디' })
+  @ApiSuccessResponse(
+    NodeContentOperationResponse,
+    200,
+    '노드 본문 operation 성공'
+  )
+  async executeContentOperation(
+    @Request() req: any,
+    @Headers('idempotency-key') idempotencyKey: string,
+    @Body() body: NodeContentOperationBody,
+    @Param('nodeId') nodeId: string,
+    @Param('workspaceId') workspaceId: string
+  ): Promise<NodeContentOperationResponse> {
+    return this.nodeService.executeContentOperation(
+      req.user?.user_id,
+      workspaceId,
+      nodeId,
+      idempotencyKey,
       body
     );
   }

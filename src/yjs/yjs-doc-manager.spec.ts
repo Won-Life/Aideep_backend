@@ -3,6 +3,7 @@ import { YjsDocManager } from './yjs-doc-manager';
 import { YjsCrdtService } from './yjs-crdt.service';
 import { EmbedQueueService } from 'src/redis/embed-queue.service';
 import { DEBOUNCE_SAVE_MS } from './yjs.constants';
+import { markdownToYjsUpdate, yjsDocToMarkdown } from './markdown-yjs';
 
 describe('YjsDocManager', () => {
   let manager: YjsDocManager;
@@ -14,12 +15,15 @@ describe('YjsDocManager', () => {
       loadFromRedis: jest.fn().mockResolvedValue(null),
       loadFromDb: jest.fn().mockResolvedValue(null),
       saveToRedis: jest.fn().mockResolvedValue(undefined),
-      saveToDb: jest.fn().mockResolvedValue(undefined),
-      deleteFromRedis: jest.fn().mockResolvedValue(undefined),
+      saveToDb: jest.fn().mockResolvedValue({
+        version: 1,
+        updatedAt: new Date('2026-08-26T00:00:00.000Z')
+      }),
+      deleteFromRedis: jest.fn().mockResolvedValue(undefined)
     } as any;
 
     mockEmbedQueueService = {
-      enqueueEmbedJob: jest.fn().mockResolvedValue(undefined),
+      enqueueEmbedJob: jest.fn().mockResolvedValue(undefined)
     } as any;
 
     manager = new YjsDocManager(mockCrdtService, mockEmbedQueueService);
@@ -63,7 +67,7 @@ describe('YjsDocManager', () => {
       mockCrdtService.loadFromRedis.mockResolvedValue(null);
       mockCrdtService.loadFromDb.mockResolvedValue({
         state,
-        workspaceId: 'ws-1',
+        workspaceId: 'ws-1'
       });
 
       const doc = await manager.getOrCreateDoc('node-1', 'ws-1');
@@ -73,7 +77,7 @@ describe('YjsDocManager', () => {
     it('prevents concurrent loads for the same nodeId', async () => {
       const [doc1, doc2] = await Promise.all([
         manager.getOrCreateDoc('node-1', 'ws-1'),
-        manager.getOrCreateDoc('node-1', 'ws-1'),
+        manager.getOrCreateDoc('node-1', 'ws-1')
       ]);
       expect(doc1).toBe(doc2);
       // loadFromRedis should be called only once
@@ -99,7 +103,7 @@ describe('YjsDocManager', () => {
 
       const flushSpy = jest
         .spyOn(manager, 'flushDoc')
-        .mockResolvedValue(undefined);
+        .mockResolvedValue({ version: 1, updatedAt: new Date() });
 
       manager.removeClient('node-1', 'socket-a');
       expect(flushSpy).toHaveBeenCalledWith('node-1');
@@ -150,13 +154,13 @@ describe('YjsDocManager', () => {
 
       expect(mockCrdtService.saveToRedis).toHaveBeenCalledWith(
         'node-1',
-        expect.any(Buffer),
+        expect.any(Buffer)
       );
       expect(mockCrdtService.saveToDb).toHaveBeenCalledWith(
         'node-1',
         expect.any(Buffer),
         'Flush me',
-        'ws-1',
+        'ws-1'
       );
     });
 
@@ -178,7 +182,7 @@ describe('YjsDocManager', () => {
       expect(mockEmbedQueueService.enqueueEmbedJob).toHaveBeenCalledWith({
         nodeId: 'node-1',
         userId: 'user-1',
-        workspaceId: 'ws-1',
+        workspaceId: 'ws-1'
       });
     });
 
@@ -189,6 +193,37 @@ describe('YjsDocManager', () => {
       await manager.flushDoc('node-1');
       await manager.flushDoc('node-1');
 
+      expect(mockEmbedQueueService.enqueueEmbedJob).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('appendMarkdown', () => {
+    it('appends through the Lexical binding and flushes the persisted state', async () => {
+      const seed = Buffer.from(markdownToYjsUpdate('# 기존 제목'));
+      mockCrdtService.loadFromDb.mockResolvedValue({
+        state: seed,
+        workspaceId: 'ws-1'
+      });
+      mockCrdtService.saveToDb.mockResolvedValue({
+        version: 3,
+        updatedAt: new Date('2026-08-26T10:00:00.000Z')
+      });
+
+      const result = await manager.appendMarkdown(
+        'node-1',
+        'ws-1',
+        '## 추가 내용\n\n- 결정 A',
+        'agent-user'
+      );
+
+      const doc = await manager.getOrCreateDoc('node-1', 'ws-1');
+      const markdown = yjsDocToMarkdown(doc);
+      expect(markdown).toContain('# 기존 제목');
+      expect(markdown).toContain('## 추가 내용');
+      expect(markdown).toContain('- 결정 A');
+      expect(result.version).toBe(3);
+      expect(result.update.byteLength).toBeGreaterThan(0);
+      expect(mockCrdtService.saveToDb).toHaveBeenCalledTimes(1);
       expect(mockEmbedQueueService.enqueueEmbedJob).toHaveBeenCalledTimes(1);
     });
   });
@@ -217,7 +252,7 @@ describe('YjsDocManager', () => {
       expect(mockEmbedQueueService.enqueueEmbedJob).toHaveBeenCalledWith({
         nodeId: 'node-1',
         userId: 'user-1',
-        workspaceId: 'ws-1',
+        workspaceId: 'ws-1'
       });
     });
 

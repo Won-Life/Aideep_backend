@@ -7,6 +7,7 @@ import {
   SAFETY_FLUSH_INTERVAL_MS,
   DOC_IDLE_TIMEOUT_MS
 } from './yjs.constants';
+import { appendMarkdownToYjsDoc, yjsDocToMarkdown } from './markdown-yjs';
 
 interface ManagedDoc {
   doc: Y.Doc;
@@ -26,6 +27,7 @@ export class YjsDocManager implements OnModuleDestroy {
   private readonly logger = new Logger(YjsDocManager.name);
   private readonly docs = new Map<string, ManagedDoc>();
   private readonly loading = new Map<string, Promise<Y.Doc>>();
+  private readonly operations = new Map<string, Promise<unknown>>();
 
   private flushInterval: ReturnType<typeof setInterval>;
 
@@ -146,6 +148,39 @@ export class YjsDocManager implements OnModuleDestroy {
     this.scheduleSave(nodeId, userId);
   }
 
+  async appendMarkdown(
+    nodeId: string,
+    workspaceId: string,
+    markdown: string,
+    userId: string
+  ): Promise<{ update: Uint8Array; version: number; updatedAt: Date }> {
+    return this.runExclusive(nodeId, async () => {
+      const doc = await this.getOrCreateDoc(nodeId, workspaceId);
+      const result = appendMarkdownToYjsDoc(doc, markdown);
+      const managed = this.docs.get(nodeId)!;
+      managed.dirtyForEmbed = true;
+      managed.lastEditorUserId = userId;
+      managed.lastActivity = Date.now();
+      const persisted = await this.flushDoc(nodeId, result.markdown);
+      return { update: result.update, ...persisted };
+    });
+  }
+
+  private async runExclusive<T>(
+    nodeId: string,
+    task: () => Promise<T>
+  ): Promise<T> {
+    const previous = this.operations.get(nodeId) ?? Promise.resolve();
+    const current = previous.catch(() => undefined).then(task);
+    this.operations.set(nodeId, current);
+    try {
+      return await current;
+    } finally {
+      if (this.operations.get(nodeId) === current)
+        this.operations.delete(nodeId);
+    }
+  }
+
   /** doc에 이미 적용된 변경에 대해 debounced save만 예약 */
   scheduleSave(nodeId: string, userId?: string): void {
     const managed = this.docs.get(nodeId);
@@ -165,9 +200,12 @@ export class YjsDocManager implements OnModuleDestroy {
 
   // ── 영속화 ───────────────────────────────────────────────────
 
-  async flushDoc(nodeId: string): Promise<void> {
+  async flushDoc(
+    nodeId: string,
+    knownMarkdown?: string
+  ): Promise<{ version: number; updatedAt: Date }> {
     const managed = this.docs.get(nodeId);
-    if (!managed) return;
+    if (!managed) throw new Error(`Yjs doc is not loaded: ${nodeId}`);
 
     if (managed.saveTimer) {
       clearTimeout(managed.saveTimer);
@@ -175,9 +213,12 @@ export class YjsDocManager implements OnModuleDestroy {
     }
 
     const state = Buffer.from(Y.encodeStateAsUpdate(managed.doc));
-    const markdownText = managed.doc.get('root', Y.XmlText).toString();
+    const rootText = managed.doc.get('root', Y.XmlText).toString();
+    const structuredMarkdown = knownMarkdown ?? yjsDocToMarkdown(managed.doc);
+    // Legacy docs may contain plain XmlText instead of Lexical embeds.
+    const markdownText = structuredMarkdown || rootText;
 
-    await Promise.all([
+    const [, persisted] = await Promise.all([
       this.crdtService.saveToRedis(nodeId, state),
       this.crdtService.saveToDb(
         nodeId,
@@ -196,15 +237,18 @@ export class YjsDocManager implements OnModuleDestroy {
         workspaceId: managed.workspaceId
       });
     }
+    return persisted;
   }
 
   async flushAll(): Promise<void> {
     const promises: Promise<void>[] = [];
     for (const nodeId of this.docs.keys()) {
       promises.push(
-        this.flushDoc(nodeId).catch((err) =>
-          this.logger.error(`Safety flush failed for ${nodeId}`, err)
-        )
+        this.flushDoc(nodeId)
+          .then(() => undefined)
+          .catch((err) =>
+            this.logger.error(`Safety flush failed for ${nodeId}`, err)
+          )
       );
     }
     await Promise.all(promises);
