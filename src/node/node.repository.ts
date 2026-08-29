@@ -374,6 +374,78 @@ export class NodeRepository {
     });
   }
 
+  async selectArchivedNodes(
+    workspaceId: string,
+    userId: string
+  ): Promise<RawNodeItem[]> {
+    return await this.prisma.client.nodes.findMany({
+      select: {
+        node_id: true,
+        title: true,
+        node_type: true,
+        content: true,
+        version: true,
+        created_at: true,
+        updated_at: true,
+        deleted_at: true,
+        position_x: true,
+        position_y: true,
+        workspace_id: true,
+        depth: true
+      },
+      where: {
+        workspace_id: workspaceId,
+        deleted_at: { not: null },
+        workspaces: {
+          users_workspaces: {
+            some: { user_id: userId }
+          }
+        }
+      },
+      orderBy: { deleted_at: 'desc' }
+    });
+  }
+
+  async selectArchivedNodeById(
+    workspaceId: string,
+    nodeId: string
+  ): Promise<RawNodeItem | null> {
+    return await this.prisma.client.nodes.findFirst({
+      select: {
+        node_id: true,
+        title: true,
+        node_type: true,
+        content: true,
+        version: true,
+        created_at: true,
+        updated_at: true,
+        deleted_at: true,
+        position_x: true,
+        position_y: true,
+        workspace_id: true,
+        depth: true
+      },
+      where: {
+        node_id: nodeId,
+        workspace_id: workspaceId,
+        deleted_at: { not: null }
+      }
+    });
+  }
+
+  // 보관 해제. 보관 시 엣지가 물리 삭제되어 복원 노드는 항상 독립 루트 → depth 0으로 재설정
+  async restoreNode(nodeId: string) {
+    return await this.prisma.client.nodes.update({
+      where: { node_id: nodeId },
+      data: {
+        deleted_at: null,
+        depth: 0,
+        updated_at: new Date(),
+        version: { increment: 1 }
+      }
+    });
+  }
+
   async increasDepth(nodeId: string, increase: number) {
     await this.prisma.client.nodes.update({
       where: { node_id: nodeId },
