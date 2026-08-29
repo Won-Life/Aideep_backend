@@ -117,6 +117,11 @@ export class AuthService {
    * 시연용 게스트 진입 — QR 1회 스캔마다 게스트 계정을 만들어 데모 워크스페이스에 참여시킨다.
    * 계정을 공유하면 refresh 토큰이 서로를 덮어써 먼저 접속한 사람이 튕기고, 커서·참여자가
    * 전부 같은 이름으로 보여 실시간 협업 시연이 성립하지 않는다.
+   *
+   * 게스트는 VIEWER로 참여시킨다 — QR은 불특정 다수에게 열려 있어 EDITOR로 두면 방문자
+   * 누구나 시연용 그래프의 노드를 옮기거나 지울 수 있고, 공용 워크스페이스라 그 훼손이
+   * 이후 모든 방문자에게 그대로 보인다. VIEWER는 노드·엣지 변경(checkEditPermission)과
+   * Yjs 본문 저장(ws.gateway)이 서버에서 거부되며, 커서 공유는 그대로 동작한다.
    */
   async enterDemo() {
     const workspaceId = process.env.DEMO_WORKSPACE_ID;
@@ -135,7 +140,7 @@ export class AuthService {
     await this.workspaceRepository.insertWorkspaceUser(
       guest.user_id,
       workspaceId,
-      'EDITOR'
+      'VIEWER'
     );
 
     this.logger.warn(
