@@ -11,7 +11,6 @@ import { UserModule } from './user/user.module';
 import { AuthModule } from './auth/auth.module';
 import { RedisModule } from './redis/redis.module';
 import { WorkspaceModule } from './workspace/workspace.module';
-import { WsModule } from './ws/ws.module';
 import { NodeModule } from './node/node.module';
 import { WinstonModule } from 'nest-winston';
 import { EdgeModule } from './edge/edge.module';
@@ -33,7 +32,6 @@ import { createWinstonConsoleTransport } from './common/logging/winston.console'
     UserModule,
     AuthModule,
     RedisModule,
-    WsModule,
     WorkspaceModule,
     NodeModule,
     EdgeModule,

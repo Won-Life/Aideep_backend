@@ -11,7 +11,7 @@ import { WorkspaceRepository } from 'src/workspace/workspace.repository';
 import { Transactional } from 'src/prisma/transactional.decorator';
 import { NodeRepository } from 'src/node/node.repository';
 import { NodeService } from 'src/node/node.service';
-import { WsGateway } from 'src/ws/ws.gateway';
+import { EventBusPublisher } from 'src/event-bus/event-bus.publisher';
 import { EdgeCreateEvent, EdgeUpdateEvent } from 'src/ws/ws.event';
 import { EdgeCreateResponse } from './dto/connectNode.dto';
 import { RedisService } from 'src/redis/redis.service';
@@ -27,7 +27,7 @@ export class EdgeService {
     private readonly workspaceRepository: WorkspaceRepository,
     private readonly nodeRepository: NodeRepository,
     private readonly nodeService: NodeService,
-    private readonly wsGateway: WsGateway,
+    private readonly wsGateway: EventBusPublisher,
     private readonly redisService: RedisService
   ) {}
   private async checkEditPermission(userId: string, workspaceId: string) {

@@ -5,7 +5,7 @@ import { EdgeRepository } from './edge.repository';
 import { WorkspaceRepository } from '../workspace/workspace.repository';
 import { NodeRepository } from '../node/node.repository';
 import { NodeService } from '../node/node.service';
-import { WsGateway } from '../ws/ws.gateway';
+import { EventBusPublisher } from 'src/event-bus/event-bus.publisher';
 import { RedisService } from '../redis/redis.service';
 
 describe('EdgeController', () => {
@@ -46,7 +46,7 @@ describe('EdgeController', () => {
           useValue: { propagateDepth: jest.fn() }
         },
         {
-          provide: WsGateway,
+          provide: EventBusPublisher,
           useValue: { broadcast: jest.fn() }
         },
         {
@@ -61,7 +61,7 @@ describe('EdgeController', () => {
     controller = module.get<EdgeController>(EdgeController);
     edgeRepo = module.get(EdgeRepository);
     workspaceRepo = module.get(WorkspaceRepository);
-    wsGateway = module.get(WsGateway);
+    wsGateway = module.get(EventBusPublisher);
   });
 
   it('should be defined', () => {

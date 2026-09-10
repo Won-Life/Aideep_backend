@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { Prisma, nodes, node_type_enum } from '../generated/prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Node } from './node.model';
-import { tree } from 'lib0';
 
 export type FtsRow = {
   nodeId: string;

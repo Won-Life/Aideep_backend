@@ -4,10 +4,10 @@ import { EdgeController } from './edge.controller';
 import { EdgeRepository } from './edge.repository';
 import { WorkspaceRepository } from 'src/workspace/workspace.repository';
 import { NodeModule } from 'src/node/node.module';
-import { WsModule } from 'src/ws/ws.module';
+import { EventBusModule } from 'src/event-bus/event-bus.module';
 
 @Module({
-  imports: [WsModule, NodeModule],
+  imports: [EventBusModule, NodeModule],
   controllers: [EdgeController],
   providers: [EdgeService, EdgeRepository, WorkspaceRepository]
 })

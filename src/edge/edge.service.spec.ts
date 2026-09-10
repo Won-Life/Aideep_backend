@@ -10,7 +10,7 @@ import { WorkspaceRepository } from 'src/workspace/workspace.repository';
 import { NodeRepository } from 'src/node/node.repository';
 import { NodeService } from 'src/node/node.service';
 import { Edge } from './edge.model';
-import { WsGateway } from 'src/ws/ws.gateway';
+import { EventBusPublisher } from 'src/event-bus/event-bus.publisher';
 import { RedisService } from 'src/redis/redis.service';
 
 // @Transactional() 데코레이터가 runInTransaction을 호출하므로 mock 처리
@@ -72,7 +72,7 @@ describe('EdgeService', () => {
           }
         },
         {
-          provide: WsGateway,
+          provide: EventBusPublisher,
           useValue: {
             broadcast: jest.fn()
           }
@@ -92,7 +92,7 @@ describe('EdgeService', () => {
     edgeRepo = module.get(EdgeRepository);
     workspaceRepo = module.get(WorkspaceRepository);
     nodeRepo = module.get(NodeRepository);
-    wsGateway = module.get(WsGateway);
+    wsGateway = module.get(EventBusPublisher);
     mockRedisClient = module.get(RedisService).getClient() as any;
   });
 

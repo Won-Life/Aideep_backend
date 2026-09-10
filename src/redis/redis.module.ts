@@ -5,6 +5,6 @@ import { EmbedQueueService } from './embed-queue.service';
 @Global()
 @Module({
   providers: [RedisService, EmbedQueueService],
-  exports: [RedisService, EmbedQueueService],
+  exports: [RedisService, EmbedQueueService]
 })
 export class RedisModule {}
