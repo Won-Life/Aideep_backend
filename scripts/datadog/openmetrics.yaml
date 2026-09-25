@@ -1,0 +1,13 @@
+init_config:
+instances:
+  - openmetrics_endpoint: http://172.17.0.1:3320/metrics
+    namespace: aideep
+    metrics:
+      - http_request_duration_seconds
+      - http_requests
+      - ws_connections_active
+      - nodejs_.*
+      - process_.*
+    tags:
+      - service:aideep-backend
+      - env:prod

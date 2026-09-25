@@ -7,4 +7,24 @@ services:
     env_file:
       - .env
 
+    environment:
+      NODE_ENV: production
+      DD_SERVICE: ${DD_SERVICE:-aideep-backend}
+      DD_ENV: ${DD_ENV:-prod}
+      DD_VERSION: ${DD_VERSION:-${IMAGE_TAG:-develop}}
+      DD_TRACE_ENABLED: ${DD_TRACE_ENABLED:-true}
+      DD_TRACE_AGENT_URL: ${DD_TRACE_AGENT_URL:-unix:///var/run/datadog/apm.socket}
+      DD_DOGSTATSD_SOCKET: /var/run/datadog/dsd.socket
+      DD_LOGS_INJECTION: "true"
+      DD_RUNTIME_METRICS_ENABLED: "true"
+
+    volumes:
+      - /var/run/datadog:/var/run/datadog:ro
+
+    labels:
+      com.datadoghq.tags.service: ${DD_SERVICE:-aideep-backend}
+      com.datadoghq.tags.env: ${DD_ENV:-prod}
+      com.datadoghq.tags.version: ${DD_VERSION:-${IMAGE_TAG:-develop}}
+      com.datadoghq.ad.logs: '[{"source":"nodejs","service":"${DD_SERVICE:-aideep-backend}"}]'
+
     restart: unless-stopped
