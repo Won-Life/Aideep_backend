@@ -5,11 +5,10 @@ import {
   Post,
   Request,
   UploadedFile,
-  UploadedFiles,
   UseGuards,
   UseInterceptors
 } from '@nestjs/common';
-import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -21,10 +20,9 @@ import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from 'src/auth/guards/jwt.guard';
 import { ApiSuccessResponse } from 'src/common/response/api-success-response.decorator';
 import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE } from './constant/upload.constant';
-import { UploadManyResponseDto } from './dto/upload-many-response.dto';
 import { UploadResponseDto } from './dto/upload-response.dto';
 import { UploadService } from './upload.service';
-import { UploadRequestDto } from './dto/uploade-request.dto';
+import { UploadRequestDto } from './dto/upload-request.dto';
 
 const MULTER_OPTIONS = {
   storage: memoryStorage(),
@@ -59,9 +57,9 @@ export class UploadController {
   @UseInterceptors(FileInterceptor('file', MULTER_OPTIONS))
   async uploadOne(
     @UploadedFile() file: Express.Multer.File,
-    @Body() body : UploadRequestDto,
+    @Body() body: UploadRequestDto,
     @Request() req: any
-  ) {
+  ): Promise<UploadResponseDto> {
     if (!file) {
       throw new BadRequestException('파일이 없습니다.');
     }

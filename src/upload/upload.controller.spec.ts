@@ -27,13 +27,6 @@ jest.mock('@nestjs/platform-express', () => {
           return next.handle();
         }
       };
-    },
-    FilesInterceptor: () => {
-      return class MockFilesInterceptor {
-        intercept(_ctx: any, next: any) {
-          return next.handle();
-        }
-      };
     }
   };
 });
@@ -46,9 +39,11 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt.guard';
 import { ALLOWED_MIME_TYPES } from './constant/upload.constant';
 
 const mockUploadService = {
-  uploadOne: jest.fn(),
-  uploadMany: jest.fn()
+  uploadOne: jest.fn()
 };
+
+// workspaceId 는 UploadRequestDto 의 @IsUUID 대상이므로 실제 UUID 를 쓴다
+const WORKSPACE_ID = '422e16a9-fc48-4c0f-b2fc-1d8b94e2792a';
 
 const mockUploadResponseDto = {
   fileId: 'file-uuid-1',
@@ -96,14 +91,20 @@ describe('UploadController', () => {
 
   const fakeReq = { user: { user_id: 'user-1' } };
 
-  // TC1: 정상 단일 업로드
+  // TC1: 정상 단일 업로드 — body DTO 의 workspaceId 를 서비스로 전달한다
   it('uploadOne: 정상 파일 → service.uploadOne 호출 후 응답 반환', async () => {
     mockUploadService.uploadOne.mockResolvedValue(mockUploadResponseDto);
     const file = makeFile();
-    const result = await controller.uploadOne(file, 'ws-uuid-1', fakeReq);
+
+    const result = await controller.uploadOne(
+      file,
+      { workspaceId: WORKSPACE_ID },
+      fakeReq
+    );
+
     expect(mockUploadService.uploadOne).toHaveBeenCalledWith(
       file,
-      'ws-uuid-1',
+      WORKSPACE_ID,
       'user-1'
     );
     expect(result).toEqual(mockUploadResponseDto);
@@ -112,8 +113,13 @@ describe('UploadController', () => {
   // TC2: 파일 없음
   it('uploadOne: 파일 없음 → BadRequestException("파일이 없습니다.")', async () => {
     await expect(
-      controller.uploadOne(undefined as any, 'ws-uuid-1', fakeReq)
+      controller.uploadOne(
+        undefined as any,
+        { workspaceId: WORKSPACE_ID },
+        fakeReq
+      )
     ).rejects.toThrow(new BadRequestException('파일이 없습니다.'));
+    expect(mockUploadService.uploadOne).not.toHaveBeenCalled();
   });
 
   // TC3: 거부 MIME
@@ -121,51 +127,28 @@ describe('UploadController', () => {
     const file = makeFile('text/plain', 'file.txt');
     let caughtError: any;
     try {
-      await controller.uploadOne(file, 'ws-uuid-1', fakeReq);
+      await controller.uploadOne(file, { workspaceId: WORKSPACE_ID }, fakeReq);
     } catch (e) {
       caughtError = e;
     }
     expect(caughtError).toBeInstanceOf(BadRequestException);
     expect(caughtError.message).toContain(ALLOWED_MIME_TYPES[0]);
+    expect(mockUploadService.uploadOne).not.toHaveBeenCalled();
   });
 
-  // TC4: workspaceId 누락
-  it('uploadOne: workspaceId 누락 → BadRequestException("workspaceId가 필요합니다.")', async () => {
+  // TC4: workspaceId 검증은 ValidationPipe(@IsUUID) 담당이라 컨트롤러 유닛 테스트 범위가 아니다.
+  //      여기서는 JWT 에 user_id 가 없을 때 컨트롤러가 임의로 막지 않고
+  //      서비스(멤버십 검증)로 위임하는지만 고정한다.
+  it('uploadOne: req.user 없음 → userId undefined 로 서비스에 위임', async () => {
+    mockUploadService.uploadOne.mockResolvedValue(mockUploadResponseDto);
     const file = makeFile();
-    await expect(
-      controller.uploadOne(file, '' as any, fakeReq)
-    ).rejects.toThrow(new BadRequestException('workspaceId가 필요합니다.'));
-  });
 
-  // TC5: 다중 업로드 정상
-  it('uploadMany: 정상 파일 배열 → service.uploadMany 호출, 응답 반환', async () => {
-    const mockManyResponse = {
-      succeeded: [mockUploadResponseDto, mockUploadResponseDto],
-      failed: []
-    };
-    mockUploadService.uploadMany.mockResolvedValue(mockManyResponse);
-    const files = [makeFile(), makeFile('image/jpeg', 'photo.jpg')];
-    const result = await controller.uploadMany(files, 'ws-uuid-1', fakeReq);
-    expect(mockUploadService.uploadMany).toHaveBeenCalledWith(
-      files,
-      'ws-uuid-1',
-      'user-1'
+    await controller.uploadOne(file, { workspaceId: WORKSPACE_ID }, {} as any);
+
+    expect(mockUploadService.uploadOne).toHaveBeenCalledWith(
+      file,
+      WORKSPACE_ID,
+      undefined
     );
-    expect(result).toEqual(mockManyResponse);
-  });
-
-  // TC6: 다중 업로드 빈 배열
-  it('uploadMany: 빈 파일 배열 → BadRequestException("파일이 없습니다.")', async () => {
-    await expect(
-      controller.uploadMany([], 'ws-uuid-1', fakeReq)
-    ).rejects.toThrow(new BadRequestException('파일이 없습니다.'));
-  });
-
-  // TC7: 다중 업로드 중 거부 MIME
-  it('uploadMany: 중 한 파일이 거부 MIME → BadRequestException', async () => {
-    const files = [makeFile(), makeFile('text/plain', 'bad.txt')];
-    await expect(
-      controller.uploadMany(files, 'ws-uuid-1', fakeReq)
-    ).rejects.toThrow(BadRequestException);
   });
 });

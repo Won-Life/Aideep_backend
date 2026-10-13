@@ -10,27 +10,23 @@ jest.mock('multer', () => {
 }, { virtual: true });
 
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  ForbiddenException,
-  InternalServerErrorException
-} from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { UploadService } from './upload.service';
-import { PrismaService } from 'src/prisma/prisma.service';
 import { S3Service } from './s3.service';
-
-const mockFindUnique = jest.fn();
-const mockFilesCreate = jest.fn();
-
-const mockPrismaService = {
-  client: {
-    users_workspaces: { findUnique: mockFindUnique },
-    files: { create: mockFilesCreate }
-  }
-};
+import { WorkspaceService } from 'src/workspace/workspace.service';
+import { UploadRepository } from './upload.repository';
 
 const mockS3Service = {
   uploadFile: jest.fn(),
   deleteFile: jest.fn()
+};
+
+const mockWorkspaceService = {
+  checkExist: jest.fn()
+};
+
+const mockUploadRepository = {
+  uploadFile: jest.fn()
 };
 
 function makeFile(
@@ -52,12 +48,14 @@ function makeFile(
   };
 }
 
-const activeMembership = {
+const ownerMembership = {
   user_id: 'user-1',
   workspace_id: 'ws-1',
   deleted_at: null,
   role: 'OWNER'
 };
+
+const viewerMembership = { ...ownerMembership, role: 'VIEWER' };
 
 const s3Result = {
   key: 'uploads/mock-uuid-1234.png',
@@ -85,43 +83,55 @@ describe('UploadService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UploadService,
-        { provide: PrismaService, useValue: mockPrismaService },
-        { provide: S3Service, useValue: mockS3Service }
+        { provide: S3Service, useValue: mockS3Service },
+        { provide: WorkspaceService, useValue: mockWorkspaceService },
+        { provide: UploadRepository, useValue: mockUploadRepository }
       ]
     }).compile();
 
     service = module.get<UploadService>(UploadService);
   });
 
-  // TC1: 멤버십 없음
-  it('uploadOne: 멤버십 null → ForbiddenException', async () => {
-    mockFindUnique.mockResolvedValue(null);
+  // TC1: 멤버십 없음 → checkExist 의 404 를 그대로 전파하고 S3 는 건드리지 않는다
+  it('uploadOne: 멤버십 없음 → NotFoundException 전파, S3 업로드 안 함', async () => {
+    mockWorkspaceService.checkExist.mockRejectedValue(
+      new NotFoundException('해당 유저의 워크스페이스가 존재하지 않습니다.')
+    );
+
     await expect(
       service.uploadOne(makeFile(), 'ws-1', 'user-1')
-    ).rejects.toThrow(ForbiddenException);
+    ).rejects.toThrow(NotFoundException);
+
+    expect(mockS3Service.uploadFile).not.toHaveBeenCalled();
   });
 
-  // TC2: 멤버십 soft-deleted
-  it('uploadOne: 멤버십 deleted_at != null → ForbiddenException', async () => {
-    mockFindUnique.mockResolvedValue({
-      ...activeMembership,
-      deleted_at: new Date()
-    });
+  // TC2: VIEWER → 403 (400 이 아니다), 업로드 자체가 일어나지 않는다
+  it('uploadOne: VIEWER → ForbiddenException, S3·DB 모두 호출 안 함', async () => {
+    mockWorkspaceService.checkExist.mockResolvedValue(viewerMembership);
+
     await expect(
       service.uploadOne(makeFile(), 'ws-1', 'user-1')
     ).rejects.toThrow(ForbiddenException);
+
+    expect(mockS3Service.uploadFile).not.toHaveBeenCalled();
+    expect(mockUploadRepository.uploadFile).not.toHaveBeenCalled();
   });
 
   // TC3: 정상 업로드
-  it('uploadOne: 정상 → S3 uploadFile + files.create 호출, UploadResponseDto 반환', async () => {
-    mockFindUnique.mockResolvedValue(activeMembership);
+  it('uploadOne: 정상 → S3 업로드 + DB 저장, UploadResponseDto 반환', async () => {
+    mockWorkspaceService.checkExist.mockResolvedValue(ownerMembership);
     mockS3Service.uploadFile.mockResolvedValue(s3Result);
-    mockFilesCreate.mockResolvedValue(dbRecord);
+    mockUploadRepository.uploadFile.mockResolvedValue(dbRecord);
 
-    const result = await service.uploadOne(makeFile(), 'ws-1', 'user-1');
+    const file = makeFile();
+    const result = await service.uploadOne(file, 'ws-1', 'user-1');
 
-    expect(mockS3Service.uploadFile).toHaveBeenCalledTimes(1);
-    expect(mockFilesCreate).toHaveBeenCalledTimes(1);
+    expect(mockS3Service.uploadFile).toHaveBeenCalledWith(file);
+    expect(mockUploadRepository.uploadFile).toHaveBeenCalledWith(
+      s3Result,
+      'user-1',
+      'ws-1'
+    );
     expect(result).toMatchObject({
       fileId: dbRecord.file_id,
       fileUrl: dbRecord.file_url,
@@ -132,73 +142,31 @@ describe('UploadService', () => {
     });
   });
 
-  // TC4: DB create 실패 → 보상 deleteFile 호출 후 InternalServerErrorException
-  it('uploadOne: DB create 실패 → s3.deleteFile 호출 후 InternalServerErrorException', async () => {
-    mockFindUnique.mockResolvedValue(activeMembership);
+  // TC4: DB 저장 실패 → 보상 삭제 후 원 에러를 그대로 전파
+  it('uploadOne: DB 저장 실패 → s3.deleteFile 보상 호출 후 원 에러 전파', async () => {
+    mockWorkspaceService.checkExist.mockResolvedValue(ownerMembership);
     mockS3Service.uploadFile.mockResolvedValue(s3Result);
-    mockFilesCreate.mockRejectedValue(new Error('DB error'));
+    const dbError = new Error('DB error');
+    mockUploadRepository.uploadFile.mockRejectedValue(dbError);
     mockS3Service.deleteFile.mockResolvedValue(undefined);
 
     await expect(
       service.uploadOne(makeFile(), 'ws-1', 'user-1')
-    ).rejects.toThrow(InternalServerErrorException);
+    ).rejects.toThrow(dbError);
 
     expect(mockS3Service.deleteFile).toHaveBeenCalledWith(s3Result.key);
   });
 
-  // TC5: DB 실패 + S3 보상 삭제도 실패 → 그래도 InternalServerErrorException
-  it('uploadOne: DB 실패 + 보상 S3 삭제 실패 → InternalServerErrorException (보상 실패 swallow)', async () => {
-    mockFindUnique.mockResolvedValue(activeMembership);
+  // TC5: 보상 삭제까지 실패해도 원 에러가 전파된다 (보상 실패는 로그만)
+  it('uploadOne: 보상 삭제 실패는 삼키고 원 에러를 전파한다', async () => {
+    mockWorkspaceService.checkExist.mockResolvedValue(ownerMembership);
     mockS3Service.uploadFile.mockResolvedValue(s3Result);
-    mockFilesCreate.mockRejectedValue(new Error('DB error'));
+    const dbError = new Error('DB error');
+    mockUploadRepository.uploadFile.mockRejectedValue(dbError);
     mockS3Service.deleteFile.mockRejectedValue(new Error('S3 delete failed'));
 
     await expect(
       service.uploadOne(makeFile(), 'ws-1', 'user-1')
-    ).rejects.toThrow(InternalServerErrorException);
-  });
-
-  // TC6: uploadMany partial failure
-  it('uploadMany: 3개 중 2번째 reject → succeeded.length===2, failed.length===1, failed[0].index===1', async () => {
-    // uploadMany calls findUnique once, then uploadOne for each file (which also calls findUnique)
-    mockFindUnique
-      .mockResolvedValueOnce(activeMembership) // uploadMany's own membership check
-      .mockResolvedValue(activeMembership);    // each uploadOne's membership check
-
-    mockS3Service.uploadFile
-      .mockResolvedValueOnce({ ...s3Result, originalName: 'a.png', key: 'uploads/a.png' })
-      .mockRejectedValueOnce(new InternalServerErrorException('파일 업로드에 실패했습니다.'))
-      .mockResolvedValueOnce({ ...s3Result, originalName: 'c.png', key: 'uploads/c.png' });
-
-    mockFilesCreate
-      .mockResolvedValueOnce({ ...dbRecord, file_id: 'fid-1' })
-      .mockResolvedValueOnce({ ...dbRecord, file_id: 'fid-3' });
-
-    mockS3Service.deleteFile.mockResolvedValue(undefined);
-
-    const files = [
-      makeFile('a.png'),
-      makeFile('b.png'),
-      makeFile('c.png')
-    ];
-
-    const result = await service.uploadMany(files, 'ws-1', 'user-1');
-
-    expect(result.succeeded).toHaveLength(2);
-    expect(result.failed).toHaveLength(1);
-    expect(result.failed[0].index).toBe(1);
-  });
-
-  // TC7: uploadMany 멤버십 없음 → ForbiddenException, uploadOne 내부 s3 호출 없음
-  it('uploadMany: 멤버십 없음 → ForbiddenException, s3.uploadFile 호출 안 됨', async () => {
-    mockFindUnique.mockResolvedValue(null);
-
-    const files = [makeFile(), makeFile('b.png')];
-
-    await expect(
-      service.uploadMany(files, 'ws-1', 'user-1')
-    ).rejects.toThrow(ForbiddenException);
-
-    expect(mockS3Service.uploadFile).not.toHaveBeenCalled();
+    ).rejects.toThrow(dbError);
   });
 });

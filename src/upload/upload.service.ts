@@ -1,17 +1,6 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-  InternalServerErrorException,
-  Logger
-} from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { S3Service } from './s3.service';
 import { UploadResponseDto } from './dto/upload-response.dto';
-import {
-  UploadManyResponseDto,
-  UploadFailureDto
-} from './dto/upload-many-response.dto';
 import { WorkspaceService } from 'src/workspace/workspace.service';
 import { UploadRepository } from './upload.repository';
 
@@ -30,10 +19,15 @@ export class UploadService {
     workspaceId: string,
     userId: string
   ): Promise<UploadResponseDto> {
-    // A-001: 워크스페이스 멤버십 검증
-    const check = await this.workspaceService.checkExist(userId, workspaceId);
-    if(check.role === "VIEWER")
-      throw new BadRequestException("파일 업로드 권한이 존재하지 않습니다.")
+    // A-001: 워크스페이스 멤버십 검증 (없으면 checkExist 가 404)
+    const membership = await this.workspaceService.checkExist(
+      userId,
+      workspaceId
+    );
+    // VIEWER 는 읽기 전용이므로 업로드 금지 (권한 오류는 403)
+    if (membership.role === 'VIEWER') {
+      throw new ForbiddenException('파일 업로드 권한이 존재하지 않습니다.');
+    }
 
     // A-003: S3 업로드 후 DB 실패 시 보상 삭제
 

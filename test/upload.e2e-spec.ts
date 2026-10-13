@@ -26,12 +26,10 @@ const mockUploadResponseDto = {
   createdAt: new Date().toISOString()
 };
 
+const WORKSPACE_ID = '422e16a9-fc48-4c0f-b2fc-1d8b94e2792a';
+
 const mockUploadService = {
-  uploadOne: jest.fn().mockResolvedValue(mockUploadResponseDto),
-  uploadMany: jest.fn().mockResolvedValue({
-    succeeded: [mockUploadResponseDto, mockUploadResponseDto],
-    failed: []
-  })
+  uploadOne: jest.fn().mockResolvedValue(mockUploadResponseDto)
 };
 
 describe('Upload (e2e)', () => {
@@ -70,17 +68,13 @@ describe('Upload (e2e)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUploadService.uploadOne.mockResolvedValue(mockUploadResponseDto);
-    mockUploadService.uploadMany.mockResolvedValue({
-      succeeded: [mockUploadResponseDto, mockUploadResponseDto],
-      failed: []
-    });
   });
 
   // TC1: POST /upload 정상 image/png 1KB → 201
   it('POST /upload: 정상 image/png → 201, 응답 필드 포함', async () => {
     const res = await request(app.getHttpServer())
       .post('/aideep/api/upload')
-      .field('workspaceId', 'ws-uuid-1')
+      .field('workspaceId', WORKSPACE_ID)
       .attach('file', Buffer.alloc(1024), {
         filename: 'test.png',
         contentType: 'image/png'
@@ -101,7 +95,7 @@ describe('Upload (e2e)', () => {
   it('POST /upload: 파일 없음 → 400', async () => {
     await request(app.getHttpServer())
       .post('/aideep/api/upload')
-      .field('workspaceId', 'ws-uuid-1')
+      .field('workspaceId', WORKSPACE_ID)
       .expect(400);
   });
 
@@ -120,7 +114,7 @@ describe('Upload (e2e)', () => {
   it('POST /upload: MIME text/plain → 400', async () => {
     await request(app.getHttpServer())
       .post('/aideep/api/upload')
-      .field('workspaceId', 'ws-uuid-1')
+      .field('workspaceId', WORKSPACE_ID)
       .attach('file', Buffer.alloc(1024), {
         filename: 'file.txt',
         contentType: 'text/plain'
@@ -133,7 +127,7 @@ describe('Upload (e2e)', () => {
     const oversize = 10 * 1024 * 1024 + 1;
     const res = await request(app.getHttpServer())
       .post('/aideep/api/upload')
-      .field('workspaceId', 'ws-uuid-1')
+      .field('workspaceId', WORKSPACE_ID)
       .attach('file', Buffer.alloc(oversize), {
         filename: 'big.png',
         contentType: 'image/png'
@@ -142,42 +136,27 @@ describe('Upload (e2e)', () => {
     expect([400, 413]).toContain(res.status);
   });
 
-  // TC6: POST /upload/many 정상 2개 → 201, succeeded 배열
-  it('POST /upload/many: 정상 2개 → 201, succeeded 배열', async () => {
-    const res = await request(app.getHttpServer())
+  // TC6: POST /upload 잘못된 workspaceId(UUID 아님) → 400
+  it('POST /upload: workspaceId 가 UUID 가 아니면 → 400', async () => {
+    await request(app.getHttpServer())
+      .post('/aideep/api/upload')
+      .field('workspaceId', 'not-a-uuid')
+      .attach('file', Buffer.alloc(1024), {
+        filename: 'test.png',
+        contentType: 'image/png'
+      })
+      .expect(400);
+  });
+
+  // TC7: /upload/many 는 현재 비활성(주석) 상태 → 라우트 없음
+  it('POST /upload/many: 비활성 라우트 → 404', async () => {
+    await request(app.getHttpServer())
       .post('/aideep/api/upload/many')
-      .field('workspaceId', 'ws-uuid-1')
+      .field('workspaceId', WORKSPACE_ID)
       .attach('files', Buffer.alloc(1024), {
         filename: 'a.png',
         contentType: 'image/png'
       })
-      .attach('files', Buffer.alloc(2048), {
-        filename: 'b.png',
-        contentType: 'image/png'
-      })
-      .expect(201);
-
-    expect(res.body.resultType).toBe('SUCCESS');
-    const data = res.body.success;
-    expect(data).toHaveProperty('succeeded');
-    expect(Array.isArray(data.succeeded)).toBe(true);
-    expect(data).toHaveProperty('failed');
-  });
-
-  // TC7: POST /upload/many 11개 → multer 거부 (400 이상)
-  it('POST /upload/many: 11개 → multer 거부 (400 이상)', async () => {
-    const req = request(app.getHttpServer())
-      .post('/aideep/api/upload/many')
-      .field('workspaceId', 'ws-uuid-1');
-
-    for (let i = 0; i < 11; i++) {
-      req.attach('files', Buffer.alloc(512), {
-        filename: `file${i}.png`,
-        contentType: 'image/png'
-      });
-    }
-
-    const res = await req;
-    expect(res.status).toBeGreaterThanOrEqual(400);
+      .expect(404);
   });
 });
