@@ -29,4 +29,4 @@ COPY prisma.config.ts ./
 
 EXPOSE 3320
 
-CMD ["node", "dist/src/main"]
+CMD ["node", "--require", "dd-trace/init", "dist/src/main"]
